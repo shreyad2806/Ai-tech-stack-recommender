@@ -1,4 +1,4 @@
-🚀 AI Tech Stack Recommender
+🚀 # AI Tech Stack Recommender
 
 AI Tech Stack Recommender is an LLM-powered web application that transforms raw project ideas into optimized technology stack recommendations, system architecture insights, and deployment strategies.
 It leverages prompt-engineered LLM workflows to act like a virtual technical architect for developers, founders, and product teams.
@@ -20,23 +20,23 @@ Uses prompt engineering to ensure contextual, structured, and optimized outputs.
 🌐 Web-Based Interface
 Simple, intuitive UI for fast experimentation and iteration.
 
-🛠️ How It Works
+#🛠️ How It Works
 
-User inputs a project idea (e.g., startup idea, AI product, SaaS, mobile app).
+--> User inputs a project idea (e.g., startup idea, AI product, SaaS, mobile app).
 
-The application processes the idea using LLM workflows.
+--> The application processes the idea using LLM workflows.
 
-The system generates:
+#The system generates:
 
-Recommended frontend, backend, database, AI/ML tools
+--> Recommended frontend, backend, database, AI/ML tools
 
-Suggested architecture patterns
+--> Suggested architecture patterns
 
-Deployment and scaling strategies
+--> Deployment and scaling strategies
 
-Output is presented in a clear, actionable format.
+--> Output is presented in a clear, actionable format.
 
-🧩 Example Use Cases
+#🧩 Example Use Cases
 
 Startup founders validating technical feasibility
 
@@ -48,7 +48,7 @@ Developers planning scalable applications
 
 AI product ideation and prototyping
 
-🧪 Tech Stack (Suggested)
+# 🧪 Tech Stack (Suggested)
 
 Frontend: React / Next.js
 
@@ -62,7 +62,7 @@ Deployment: Docker, Cloud platforms (AWS / GCP / Azure)
 
 Note: The recommender adapts stacks dynamically based on project requirements.
 
-📦 Installation & Setup
+#📦 Installation & Setup
 # Clone the repository
 git clone https://github.com/your-username/Ai-tech-stack-recommender.git
 
