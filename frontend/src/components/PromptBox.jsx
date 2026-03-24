@@ -1,51 +1,25 @@
-import axios from "axios";
-import { useState } from "react";
+<div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-xl">
+  <h2 className="text-lg font-semibold text-neutral-100 mb-1">
+    Describe your project
+  </h2>
 
-export default function PromptBox({ setResult }) {
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
+  <p className="text-sm text-neutral-400 mb-4">
+    Tell the AI about your idea, scale, and constraints
+  </p>
 
-  const generate = async () => {
-    if (!input) return;
-    setLoading(true);
+  <textarea
+    className="w-full h-32 rounded-xl bg-neutral-800 border border-neutral-700 p-4 text-sm text-neutral-100 resize-none
+               focus:outline-none focus:ring-2 focus:ring-emerald-500"
+    placeholder="e.g. AI-powered resume screening platform..."
+  />
 
-    try {
-      const res = await axios.post("http://127.0.0.1:8000/recommend", {
-        description: input,
-      });
-      setResult(res.data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="card">
-      <div className="flex items-start justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">Describe your project</h3>
-          <p className="text-sm muted">Tell the copilot about your idea and constraints</p>
-        </div>
-      </div>
-
-      <textarea
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        placeholder="Describe your project idea..."
-        className="w-full h-32 bg-zinc-800 rounded-xl p-4 text-sm resize-none outline-none mt-4"
-      />
-
-      <div className="flex items-center justify-between mt-4">
-        <div className="text-sm muted">Examples: chatbot, fintech dashboard, healthcare app</div>
-        <div className="flex items-center space-x-3">
-          <button className="bg-zinc-800 px-4 py-2 rounded-md text-sm muted hover:bg-zinc-700 transition">Clear</button>
-          <button onClick={generate} className="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-md text-sm">
-            {loading ? "Generating..." : "Generate Tech Stack"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+  <div className="flex justify-end mt-4">
+    <button
+      className="bg-gradient-to-r from-emerald-500 to-teal-500 
+                 hover:from-emerald-400 hover:to-teal-400
+                 transition px-6 py-2 rounded-lg text-sm font-medium text-black"
+    >
+      Generate Tech Stack
+    </button>
+  </div>
+</div>

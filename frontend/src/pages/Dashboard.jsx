@@ -9,28 +9,20 @@ export default function Dashboard() {
   const [result, setResult] = useState(null);
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen bg-neutral-950 text-neutral-100">
       <Sidebar />
 
-      <main className="flex-1 overflow-auto">
+      <div className="flex-1 flex flex-col">
         <Header />
 
-        <div className="max-w-6xl px-6 py-10 mx-auto space-y-8">
-          <PromptBox setResult={setResult} />
-
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="space-y-6 lg:col-span-2">
-              <ExampleCards />
-              {result && <ResultPanel result={result} />}
-            </div>
-
-            <aside className="card">
-              <h4 className="font-semibold">Project Info</h4>
-              <p className="mt-2 text-sm muted">Summary, constraints and notes will appear here.</p>
-            </aside>
+        <main className="flex-1 overflow-y-auto px-8 py-10">
+          <div className="w-full max-w-4xl ml-6 space-y-8">
+            <PromptBox setResult={setResult} />
+            <ExampleCards />
+            {result && <ResultPanel result={result} />}
           </div>
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

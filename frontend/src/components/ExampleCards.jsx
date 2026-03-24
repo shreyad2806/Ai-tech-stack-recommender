@@ -1,23 +1,30 @@
 const examples = [
-  "AI-based resume screening platform",
-  "Fintech dashboard with fraud detection",
-  "Healthcare appointment management system",
+  {
+    title: "AI Resume Screening",
+    desc: "LLM-powered candidate ranking system",
+  },
+  {
+    title: "Fintech Fraud Detection",
+    desc: "Real-time transaction anomaly detection",
+  },
+  {
+    title: "Healthcare Appointment System",
+    desc: "Scalable booking and patient management",
+  },
 ];
 
 export default function ExampleCards() {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      {examples.map((text) => (
+    <div className="grid gap-4 md:grid-cols-3">
+      {examples.map((ex) => (
         <div
-          key={text}
-          className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl hover:shadow-lg hover:border-indigo-500 cursor-pointer transition flex flex-col justify-between"
+          key={ex.title}
+          className="p-5 transition border cursor-pointer bg-slate-900 border-slate-800 rounded-xl hover:border-indigo-500"
         >
-          <p className="text-sm text-zinc-200 mb-4">{text}</p>
-          <div className="text-xs muted">Use as a starting point</div>
+          <h3 className="mb-1 font-medium">{ex.title}</h3>
+          <p className="text-sm text-slate-400">{ex.desc}</p>
         </div>
       ))}
     </div>
   );
 }
-
-

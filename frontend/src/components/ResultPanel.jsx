@@ -1,16 +1,25 @@
-export default function ResultPanel({ result }) {
-  if (!result) return null;
-
+export default function ResultDashboard({ result }) {
   return (
-    <div className="card">
-      <h3 className="mb-2 text-lg font-semibold">Recommended Tech Stack</h3>
-      <p className="mb-4 text-sm muted">Structured suggestions based on your description</p>
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
+      <h2 className="text-lg font-semibold">
+        Recommended Architecture
+      </h2>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="grid md:grid-cols-2 gap-6">
         {Object.entries(result).map(([key, value]) => (
-          <div key={key} className="p-4 bg-zinc-800 rounded-xl">
-            <h4 className="mb-2 text-sm font-semibold uppercase accent">{key}</h4>
-            <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(value, null, 2)}</pre>
+          <div
+            key={key}
+            className="bg-slate-800 rounded-xl p-4"
+          >
+            <h3 className="text-indigo-400 text-sm font-semibold uppercase mb-2">
+              {key}
+            </h3>
+
+            <pre className="text-xs text-slate-200 whitespace-pre-wrap">
+              {typeof value === "string"
+                ? value
+                : JSON.stringify(value, null, 2)}
+            </pre>
           </div>
         ))}
       </div>
