@@ -11,7 +11,7 @@ export default function Hero() {
       {/* Heading */}
       <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-white mb-8 leading-tight max-w-4xl">
         Build your{" "}
-        <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-emerald-400 to-purple-500">
+        <span className="text-transparent bg-clip-text bg-linear-to-r from-white via-emerald-400 to-purple-500">
           tech stack
         </span>
         <br className="hidden md:block" /> in seconds with AI
@@ -27,7 +27,7 @@ export default function Hero() {
       <div className="flex flex-col sm:flex-row items-center gap-4 mb-20">
         <Link
           to="/get-started"
-          className="px-8 py-3.5 text-[#09090f] bg-gradient-to-r from-emerald-300 to-emerald-400 rounded-xl font-bold text-lg hover:brightness-110 transition-all shadow-[0_0_30px_rgba(52,211,153,0.3)]"
+          className="px-8 py-3.5 text-[#09090f] bg-linear-to-r from-emerald-300 to-emerald-400 rounded-xl font-bold text-lg hover:brightness-110 transition-all shadow-[0_0_30px_rgba(52,211,153,0.3)]"
         >
           Get Started — It's Free
         </Link>
