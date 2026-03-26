@@ -1,6 +1,8 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function Header() {
+  const navigate = useNavigate();
+
   return (
     <header className="sticky top-0 z-50 backdrop-blur-md bg-black/30 w-full text-white">
       <div className="flex justify-between items-center max-w-7xl mx-auto px-6 py-4">
@@ -26,16 +28,17 @@ export default function Header() {
           <div className="flex items-center gap-4">
             <Link 
               to="/auth" 
-              className="border border-white/20 rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 transition-colors"
+              state={{ mode: "login" }}
+              className="cursor-pointer border border-white/20 rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 transition-colors"
             >
               Login
             </Link>
-            <Link 
-              to="/dashboard" 
-              className="bg-gradient-to-r from-[#6ef0c0] to-[#8b8bff] text-black rounded-lg px-4 py-2 text-sm font-bold transition-opacity hover:opacity-90"
+            <button
+              onClick={() => navigate("/auth", { state: { mode: "signup" } })}
+              className="cursor-pointer bg-gradient-to-r from-[#6ef0c0] to-[#8b8bff] text-black rounded-lg px-4 py-2 text-sm font-bold transition-opacity hover:opacity-90"
             >
               Try Now
-            </Link>
+            </button>
           </div>
         </div>
       </div>

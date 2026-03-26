@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Mail, Lock, EyeOff } from "lucide-react";
 
 export default function Auth() {
-  const [isLogin, setIsLogin] = useState(true);
+  const location = useLocation();
+  const modeFromNav = location.state?.mode || "login";
+  const [mode, setMode] = useState(modeFromNav);
 
   return (
     <div className="min-h-screen bg-[#050508] flex items-center justify-center relative overflow-hidden p-6 font-sans">
@@ -27,10 +29,10 @@ export default function Auth() {
 
         {/* Text Headers */}
         <h1 className="text-3xl font-extrabold text-white mb-2 tracking-wide text-center mt-2 transition-all duration-500">
-          {isLogin ? "Login to StackMind" : "Create your account"}
+          {mode === "login" ? "Login to StackMind" : "Create your account"}
         </h1>
         <p className="text-sm text-gray-400 text-center mb-10 transition-all duration-500">
-          {isLogin ? "Welcome back! Sign in to generate your ideal tech stack" : "Join us and start building your perfect tech stack"}
+          {mode === "login" ? "Welcome back! Sign in to generate your ideal tech stack" : "Join us and start building your perfect tech stack"}
         </p>
 
         {/* Form */}
@@ -58,7 +60,7 @@ export default function Auth() {
           </div>
 
           {/* Confirm Password Input (Signup only) */}
-          <div className={`relative group overflow-hidden transition-all duration-500 ease-in-out ${isLogin ? 'max-h-0 opacity-0 -mt-5' : 'max-h-24 opacity-100'}`}>
+          <div className={`relative group overflow-hidden transition-all duration-500 ease-in-out ${mode === "login" ? 'max-h-0 opacity-0 -mt-5' : 'max-h-24 opacity-100'}`}>
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 group-focus-within:text-[#6ef0c0] transition-colors duration-300" />
               <input 
                 type="password" 
@@ -69,12 +71,12 @@ export default function Auth() {
           </div>
 
           {/* Login / Signup Button */}
-          <button className={`w-full bg-linear-to-r from-[#6ef0c0] to-[#8b8bff] text-black font-extrabold text-lg py-4 rounded-xl hover:-translate-y-0.5 hover:shadow-[0_0_25px_rgba(139,139,255,0.4)] active:scale-[0.98] transition-all duration-300 cursor-pointer ${isLogin ? 'mt-8' : 'mt-10'}`}>
-             {isLogin ? "Login" : "Create Account"}
+          <button className={`w-full bg-linear-to-r from-[#6ef0c0] to-[#8b8bff] text-black font-extrabold text-lg py-4 rounded-xl hover:-translate-y-0.5 hover:shadow-[0_0_25px_rgba(139,139,255,0.4)] active:scale-[0.98] transition-all duration-300 cursor-pointer ${mode === "login" ? 'mt-8' : 'mt-10'}`}>
+             {mode === "login" ? "Login" : "Create Account"}
           </button>
 
           {/* Forgot Password */}
-          <div className={`text-center overflow-hidden transition-all duration-500 ease-in-out ${isLogin ? 'max-h-10 opacity-100 mt-5' : 'max-h-0 opacity-0 mt-0'}`}>
+          <div className={`text-center overflow-hidden transition-all duration-500 ease-in-out ${mode === "login" ? 'max-h-10 opacity-100 mt-5' : 'max-h-0 opacity-0 mt-0'}`}>
             <Link to="#" className="text-sm font-medium text-gray-400 hover:text-white transition-colors duration-300">
               Forgot your password?
             </Link>
@@ -89,15 +91,15 @@ export default function Auth() {
 
           {/* Sign up / Login Toggle */}
           <div className="text-center text-sm font-medium text-gray-400 mb-2">
-            {isLogin ? "Don't have an account? " : "Already have an account? "}
+            {mode === "login" ? "Don't have an account? " : "Already have an account? "}
             <button 
               onClick={(e) => {
                 e.preventDefault();
-                setIsLogin(!isLogin);
+                setMode(mode === "login" ? "signup" : "login");
               }} 
               className="text-[#8b8bff] hover:text-white hover:drop-shadow-[0_0_10px_rgba(139,139,255,0.8)] transition-all duration-300 font-extrabold border-none bg-transparent cursor-pointer p-0 ml-1 tracking-wide"
             >
-              {isLogin ? "Sign up" : "Login"}
+              {mode === "login" ? "Sign up" : "Login"}
             </button>
           </div>
 

@@ -1,7 +1,9 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Play, Sparkles, Zap, Database, Triangle } from "lucide-react";
 
 export default function Hero() {
+  const navigate = useNavigate();
+
   return (
     <section className="relative px-6 pt-32 pb-24 max-w-7xl mx-auto flex flex-col items-center text-center overflow-hidden">
       {/* Background Glows */}
@@ -25,12 +27,12 @@ export default function Hero() {
 
       {/* Buttons */}
       <div className="flex flex-col sm:flex-row items-center gap-4 mb-20">
-        <Link
-          to="/get-started"
-          className="px-8 py-3.5 text-[#09090f] bg-linear-to-r from-emerald-300 to-emerald-400 rounded-xl font-bold text-lg hover:brightness-110 transition-all shadow-[0_0_30px_rgba(52,211,153,0.3)]"
+        <button
+          onClick={() => navigate("/auth", { state: { mode: "login" } })}
+          className="cursor-pointer px-8 py-3.5 text-[#09090f] bg-linear-to-r from-emerald-300 to-emerald-400 rounded-xl font-bold text-lg hover:brightness-110 transition-all shadow-[0_0_30px_rgba(52,211,153,0.3)]"
         >
           Get Started — It's Free
-        </Link>
+        </button>
         <Link
           to="/demo"
           className="px-8 py-3.5 text-white bg-white/5 border border-white/10 rounded-xl font-medium text-lg flex items-center gap-2 hover:bg-white/10 transition-all"
