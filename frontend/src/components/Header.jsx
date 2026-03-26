@@ -35,7 +35,7 @@ export default function Header() {
             </Link>
             <button
               onClick={() => navigate("/auth", { state: { mode: "signup" } })}
-              className="cursor-pointer bg-gradient-to-r from-[#6ef0c0] to-[#8b8bff] text-black rounded-lg px-4 py-2 text-sm font-bold transition-opacity hover:opacity-90"
+              className="cursor-pointer bg-linear-to-r from-[#6ef0c0] to-[#8b8bff] text-black rounded-lg px-4 py-2 text-sm font-bold transition-opacity hover:opacity-90"
             >
               Try Now
             </button>

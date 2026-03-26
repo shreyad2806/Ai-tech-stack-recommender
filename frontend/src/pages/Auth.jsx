@@ -1,11 +1,57 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Mail, Lock, EyeOff } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Mail, Lock, EyeOff, Eye } from "lucide-react";
 
 export default function Auth() {
   const location = useLocation();
+  const navigate = useNavigate();
   const modeFromNav = location.state?.mode || "login";
   const [mode, setMode] = useState(modeFromNav);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  const handleAuth = async () => {
+    setIsLoading(true);
+    try {
+      if (mode === "signup") {
+        const signupResponse = await fetch("http://localhost:8000/signup", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email, password }),
+        });
+
+        if (!signupResponse.ok) {
+          alert("Error creating account");
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      const response = await fetch("http://localhost:8000/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        localStorage.setItem("token", data.access_token);
+        navigate("/dashboard");
+      } else {
+        alert("Invalid credentials");
+      }
+    } catch (error) {
+      alert("Invalid credentials");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#050508] flex items-center justify-center relative overflow-hidden p-6 font-sans">
@@ -43,6 +89,8 @@ export default function Auth() {
             <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 group-focus-within:text-[#6ef0c0] transition-colors duration-300" />
             <input 
               type="email" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               placeholder="Email" 
               className="w-full bg-[#0d0d14] border border-white/10 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6ef0c0]/50 focus:border-[#6ef0c0]/50 hover:border-white/20 transition-all duration-300 font-medium"
             />
@@ -52,26 +100,40 @@ export default function Auth() {
           <div className="relative group">
             <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 group-focus-within:text-[#6ef0c0] transition-colors duration-300" />
             <input 
-              type="password" 
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               placeholder="Password" 
               className="w-full bg-[#0d0d14] border border-white/10 rounded-xl py-3.5 pl-12 pr-12 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6ef0c0]/50 focus:border-[#6ef0c0]/50 hover:border-white/20 transition-all duration-300 font-medium"
             />
-            <EyeOff className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 cursor-pointer hover:text-white transition-colors duration-200" />
+            {showPassword ? (
+              <Eye onClick={() => setShowPassword(false)} className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 cursor-pointer hover:text-white transition-colors duration-200" />
+            ) : (
+              <EyeOff onClick={() => setShowPassword(true)} className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 cursor-pointer hover:text-white transition-colors duration-200" />
+            )}
           </div>
 
           {/* Confirm Password Input (Signup only) */}
           <div className={`relative group overflow-hidden transition-all duration-500 ease-in-out ${mode === "login" ? 'max-h-0 opacity-0 -mt-5' : 'max-h-24 opacity-100'}`}>
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 group-focus-within:text-[#6ef0c0] transition-colors duration-300" />
               <input 
-                type="password" 
+                type={showPassword ? "text" : "password"}
                 placeholder="Confirm Password" 
                 className="w-full bg-[#0d0d14] border border-white/10 rounded-xl py-3.5 pl-12 pr-12 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6ef0c0]/50 focus:border-[#6ef0c0]/50 hover:border-white/20 transition-all duration-300 font-medium"
               />
-              <EyeOff className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 cursor-pointer hover:text-white transition-colors duration-200" />
+              {showPassword ? (
+                <Eye onClick={() => setShowPassword(false)} className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 cursor-pointer hover:text-white transition-colors duration-200" />
+              ) : (
+                <EyeOff onClick={() => setShowPassword(true)} className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 cursor-pointer hover:text-white transition-colors duration-200" />
+              )}
           </div>
 
           {/* Login / Signup Button */}
-          <button className={`w-full bg-linear-to-r from-[#6ef0c0] to-[#8b8bff] text-black font-extrabold text-lg py-4 rounded-xl hover:-translate-y-0.5 hover:shadow-[0_0_25px_rgba(139,139,255,0.4)] active:scale-[0.98] transition-all duration-300 cursor-pointer ${mode === "login" ? 'mt-8' : 'mt-10'}`}>
+          <button 
+            onClick={handleAuth}
+            disabled={isLoading}
+            className={`w-full bg-linear-to-r from-[#6ef0c0] to-[#8b8bff] text-black font-extrabold text-lg py-4 rounded-xl hover:-translate-y-0.5 hover:shadow-[0_0_25px_rgba(139,139,255,0.4)] active:scale-[0.98] transition-all duration-300 cursor-pointer ${mode === "login" ? 'mt-8' : 'mt-10'} disabled:opacity-75 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none`}
+          >
              {mode === "login" ? "Login" : "Create Account"}
           </button>
 
