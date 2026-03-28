@@ -12,45 +12,62 @@ export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleAuth = async () => {
-    setIsLoading(true);
+  const handleSignup = async () => {
     try {
-      if (mode === "signup") {
-        const signupResponse = await fetch("http://localhost:8000/signup", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ email, password }),
-        });
-
-        if (!signupResponse.ok) {
-          alert("Error creating account");
-          setIsLoading(false);
-          return;
-        }
-      }
-
-      const response = await fetch("http://localhost:8000/login", {
+      await fetch("http://localhost:8000/signup", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem("token", data.access_token);
-        navigate("/dashboard");
-      } else {
-        alert("Invalid credentials");
-      }
-    } catch (error) {
-      alert("Invalid credentials");
-    } finally {
-      setIsLoading(false);
+      const res = await fetch("http://localhost:8000/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      localStorage.setItem("token", data.access_token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+
+      navigate("/dashboard");
+
+    } catch (err) {
+      console.error(err);
     }
+  };
+
+  const handleLogin = async () => {
+    try {
+      const res = await fetch("http://localhost:8000/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      localStorage.setItem("token", data.access_token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+
+      navigate("/dashboard");
+
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleAuth = async () => {
+    setIsLoading(true);
+    
+    if (mode === "signup") {
+      await handleSignup();
+    } else {
+      await handleLogin();
+    }
+    
+    setIsLoading(false);
   };
 
   return (

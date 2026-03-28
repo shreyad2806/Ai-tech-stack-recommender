@@ -1,17 +1,19 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, EmailStr
-from dotenv import load_dotenv
 import os
 import json
 import bcrypt
 import jwt
 from datetime import datetime, timedelta
-import uuid
 from typing import Optional
-from fastapi import Depends
+
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, EmailStr
+from dotenv import load_dotenv
+from sqlalchemy.orm import Session
 
 import google.genai as genai
+from database import engine, SessionLocal
+from models import Base, User  # ✅ ONLY DB MODEL
 
 # ---------------- LOAD ENV ----------------
 load_dotenv()
@@ -28,27 +30,31 @@ model_name = "gemini-2.5-flash"
 # ---------------- FASTAPI APP ----------------
 app = FastAPI(title="AI Tech Stack Recommender")
 
-# ---------------- AUTH CONFIG & DB ----------------
+# ---------------- INIT DATABASE ----------------
+Base.metadata.create_all(bind=engine)
+
+# ---------------- DATABASE DEPENDENCY ----------------
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# ---------------- AUTH CONFIG ----------------
 SECRET_KEY = os.getenv("SECRET_KEY", "super-secret-key-for-dev")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # 1 week
-
-fake_users_db = {}
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 1 week
 
 def verify_password(plain_password, hashed_password):
     return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
 def get_password_hash(password):
-    salt = bcrypt.gensalt()
-    hashed_bytes = bcrypt.hashpw(password.encode('utf-8'), salt)
-    return hashed_bytes.decode('utf-8')
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode("utf-8")
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=15))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -61,7 +67,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---------------- REQUEST MODEL ----------------
+# ---------------- REQUEST MODELS ----------------
 class ProjectInput(BaseModel):
     description: str
 
@@ -77,50 +83,57 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
-class User(BaseModel):
-    id: str
-    email: str
-    hashed_password: str
-
 # ---------------- AUTH ENDPOINTS ----------------
-@app.post("/signup")
-def signup(user: UserCreate):
-    if user.email in fake_users_db:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    user_id = str(uuid.uuid4())
-    hashed_password = get_password_hash(user.password)
-    
-    new_user = User.model_validate({
-        "id": user_id,
-        "email": user.email,
-        "hashed_password": hashed_password
-    })
-    
-    fake_users_db[user.email] = new_user
-    
-    return {"message": "User created successfully", "user_id": user_id}
 
+# ✅ SIGNUP FIXED
+@app.post("/signup")
+def signup(user: UserCreate, db: Session = Depends(get_db)):
+
+    existing_user = db.query(User).filter(User.email == user.email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    hashed_password = get_password_hash(user.password)
+
+    new_user = User(email=user.email, password=hashed_password)
+
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    return {"message": "User created successfully"}
+
+
+# ✅ LOGIN FIXED
 @app.post("/login", response_model=Token)
-def login(user: UserLogin):
-    db_user = fake_users_db.get(user.email)
+def login(user: UserLogin, db: Session = Depends(get_db)):
+
+    db_user = db.query(User).filter(User.email == user.email).first()
+
     if not db_user:
-        raise HTTPException(status_code=400, detail="Incorrect email or password")
-        
-    if not verify_password(user.password, db_user.hashed_password):
-        raise HTTPException(status_code=400, detail="Incorrect email or password")
-        
+        raise HTTPException(status_code=400, detail="Invalid credentials")
+
+    if not verify_password(user.password, db_user.password):
+        raise HTTPException(status_code=400, detail="Invalid credentials")
+
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": db_user.email}, expires_delta=access_token_expires
+        data={"sub": db_user.email},
+        expires_delta=access_token_expires
     )
-    
-    return {"access_token": access_token, "token_type": "bearer"}
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "email": db_user.email
+        }
+    }
 
 # ---------------- ROOT ----------------
 @app.get("/")
 def root():
-    return {"status": "Backend running with Gemini (Structured Output)"}
+    return {"status": "Backend running with Gemini + PostgreSQL"}
 
 # ---------------- PROMPT ----------------
 def build_prompt(project_description: str) -> str:
@@ -128,10 +141,6 @@ def build_prompt(project_description: str) -> str:
 You are a senior software architect.
 
 Analyze the project idea below and respond ONLY in valid JSON.
-DO NOT include markdown, explanations, or extra text.
-DO NOT wrap the JSON in backticks.
-
-Use this EXACT JSON structure:
 
 {{
   "tech_stack": {{
@@ -158,33 +167,18 @@ Project Idea:
 def recommend_stack(data: ProjectInput):
     try:
         prompt = build_prompt(data.description)
+
         response = client.models.generate_content(
             model=model_name,
             contents=prompt
         )
 
-        if not response.text:
-            raise HTTPException(
-                status_code=500,
-                detail="AI response was empty"
-            )
-
-        raw_text = response.text.strip()
-
-        # Parse JSON safely
-        structured_output = json.loads(raw_text)
+        structured_output = json.loads(response.text.strip())
 
         return {
             "project_description": data.description,
             "result": structured_output
         }
 
-    except json.JSONDecodeError:
-        raise HTTPException(
-            status_code=500,
-            detail="AI response was not valid JSON"
-        )
     except Exception as e:
-        print("Gemini Error:", e)
         raise HTTPException(status_code=500, detail=str(e))
-

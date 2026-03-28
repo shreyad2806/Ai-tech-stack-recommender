@@ -1,6 +1,33 @@
 import { Search, Plus, MoreHorizontal, Settings, Terminal, Moon, Bell, LogOut, Clock } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function Sidebar() {
+  const navigate = useNavigate();
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const userData = localStorage.getItem("user");
+    if (userData) {
+      try {
+        setUser(JSON.parse(userData));
+      } catch (error) {
+        console.error("Error parsing user data:", error);
+        setUser(null);
+      }
+    }
+  }, []);
+
+  const getUserInitials = (email) => {
+    if (!email) return "U";
+    return email.substring(0, 2).toUpperCase();
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    navigate("/auth");
+  };
   const historyChats = [
     { id: 1, title: "E-commerce SaaS", color: "bg-linear-to-tr from-pink-400 to-orange-400" },
     { id: 2, title: "Fintech Payment Gateway", color: "bg-linear-to-tr from-emerald-400 to-teal-400" },
@@ -64,11 +91,11 @@ export default function Sidebar() {
         <div className="flex items-center justify-between p-2 rounded-xl hover:bg-white/5 cursor-pointer transition-colors mb-3">
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="w-9 h-9 rounded-full bg-purple-600/20 flex items-center justify-center shrink-0 border border-purple-500/20">
-              <span className="text-xs font-bold text-purple-300">RK</span>
+              <span className="text-xs font-bold text-purple-300">{getUserInitials(user?.email)}</span>
             </div>
             <div className="flex flex-col overflow-hidden">
-              <span className="text-sm font-bold text-white truncate">Rahul</span>
-              <span className="text-xs text-gray-500 truncate">rahul@example.com</span>
+              <span className="text-sm font-bold text-white truncate">{user?.email || "Guest"}</span>
+              <span className="text-xs text-gray-500 truncate">{user?.email || "Not logged in"}</span>
             </div>
           </div>
           <Settings className="w-4 h-4 text-gray-500 hover:text-white transition-colors shrink-0" />
@@ -85,7 +112,10 @@ export default function Sidebar() {
           <button className="p-2 rounded-lg bg-[#151522] hover:bg-white/10 text-gray-400 hover:text-white transition-colors border border-white/5">
             <Bell className="w-3.5 h-3.5" />
           </button>
-          <button className="p-2 rounded-lg bg-[#151522] hover:bg-white/10 text-gray-400 hover:text-red-400 transition-colors border border-white/5">
+          <button 
+            onClick={handleLogout}
+            className="p-2 rounded-lg bg-[#151522] hover:bg-white/10 text-gray-400 hover:text-red-400 transition-colors border border-white/5"
+          >
             <LogOut className="w-3.5 h-3.5" />
           </button>
         </div>

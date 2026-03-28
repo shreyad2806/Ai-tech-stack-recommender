@@ -1,10 +1,32 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import InputBox from "../components/InputBox";
 import { Share, Bell, Settings, LogOut, Eraser } from "lucide-react";
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    
+    if (!token) {
+      navigate("/auth");
+      return;
+    }
+
+    const userData = localStorage.getItem("user");
+    if (userData) {
+      try {
+        setUser(JSON.parse(userData));
+      } catch (error) {
+        console.error("Error parsing user data:", error);
+        setUser(null);
+      }
+    }
+  }, [navigate]);
 
   return (
     <div className="min-h-screen w-full bg-[#050508] flex font-sans overflow-hidden">
@@ -84,7 +106,7 @@ export default function Dashboard() {
               {/* Hero Section */}
               <div className="mt-2 mb-8 flex flex-col items-start text-left shrink-0">
                 <p className="text-gray-300 font-semibold mb-2 tracking-wide text-sm md:text-[15px]">
-                  Good afternoon, Rahul
+                  Good afternoon, {user?.email || "User"}
                 </p>
                 
                 <h1 className="text-5xl lg:text-[4rem] font-extrabold text-white mb-4 leading-[1.1] tracking-tight">
