@@ -1,11 +1,12 @@
 import os
 import json
 import logging
+import asyncio
 from typing import Any
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -156,6 +157,34 @@ Return ONLY JSON:
         "deployment": parsed.get("deployment", ""),
         "roadmap": parsed.get("roadmap", []),
     }
+
+@app.post("/recommend-stream")
+async def recommend_stream(data: IdeaRequest):
+    idea = data.idea
+
+    async def stream_generator():
+        try:
+            prompt = f"""
+            Give a tech stack for:
+            {idea}
+
+            Return JSON with:
+            architecture, core_technologies, deployment, roadmap
+            """
+
+            response = model.generate_content(prompt)
+
+            text = response.text if hasattr(response, "text") else str(response)
+
+            # Simulate streaming (token by token)
+            for chunk in text.split(" "):
+                yield chunk + " "
+                await asyncio.sleep(0.02)  # typing effect speed
+
+        except Exception as e:
+            yield f"ERROR: {str(e)}"
+
+    return StreamingResponse(stream_generator(), media_type="text/plain")
 
 
 # 💾 SAVE STACK

@@ -8,68 +8,59 @@ export default function InputBox({ input, setInput, result, setResult }) {
   // Safe result object
   const safeResult = result && typeof result === "object" ? result : null;
 
-  const handleGenerate = async () => {
+  const handleStreamGenerate = async () => {
     if (!input.trim()) return;
 
+    const idea = input.trim();
     setLoading(true);
-    setError(null);
+    setError("");
+    setResult(null);
 
     try {
-      const token = localStorage.getItem("token");
-
-      const bodyPayload = { idea: input.trim() };
-      console.log("Sending /recommend payload:", bodyPayload);
-
-      const res = await fetch("http://127.0.0.1:8000/recommend", {
+      const res = await fetch("http://127.0.0.1:8000/recommend-stream", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify(bodyPayload),
+        body: JSON.stringify({ idea }),
       });
 
-      console.log("/recommend response status:", res.status);
+      if (!res.body) throw new Error("No stream received");
 
-      if (!res.ok) {
-        const text = await res.text();
-        console.error("Backend error:", text);
-        throw new Error("Request failed");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let fullText = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        fullText += chunk;
+
+        setResult({
+          architecture: fullText,
+          core_technologies: [],
+          deployment: "",
+          roadmap: [],
+        });
       }
 
-      const data = await res.json();
-      console.log("/recommend parsed JSON:", data);
-
-      // Normalize backend response
-      const normalized = {
-        architecture: data.architecture || "",
-        core_technologies: data.core_technologies || [],
-        deployment: data.deployment || "",
-        roadmap: data.roadmap || [],
-      };
-
-      setResult(normalized);
-      localStorage.setItem("lastStack", JSON.stringify(normalized));
-      localStorage.setItem("lastIdea", input.trim());
-      console.log("Saved to localStorage:", {
-        lastStack: normalized,
-        lastIdea: input.trim(),
-      });
-
-    // ✅ ADD THIS (SAVE TO DB)
-    try {
-      await fetch("http://127.0.0.1:8000/save-stack", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idea: input, ...normalized }),
-      });
-    } catch (e) {
-      console.error("Save failed:", e);
-    }
+      localStorage.setItem(
+        "lastStack",
+        JSON.stringify({
+          architecture: fullText,
+          core_technologies: [],
+          deployment: "",
+          roadmap: [],
+        }),
+      );
+      localStorage.setItem("lastIdea", idea);
+      console.log("Saved streaming result to localStorage");
 
     } catch (err) {
-      console.error("API ERROR:", err);
-      setError(err.message || "Something went wrong. Try again.");
+      console.error(err);
+      setError("Streaming failed");
     } finally {
       setLoading(false);
     }
@@ -121,7 +112,7 @@ export default function InputBox({ input, setInput, result, setResult }) {
           </div>
 
           <button 
-            onClick={handleGenerate}
+            onClick={handleStreamGenerate}
             disabled={loading || !input.trim()}
             className="bg-[#6ef0c0] text-black font-bold px-6 py-3 rounded-xl"
           >
