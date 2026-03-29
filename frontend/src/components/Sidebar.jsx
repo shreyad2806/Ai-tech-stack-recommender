@@ -33,7 +33,15 @@ export default function Sidebar() {
       </div>
 
       {/* New Chat */}
-      <button className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#6ef0c0] text-black font-semibold mb-6">
+      <button
+        onClick={() => {
+          localStorage.removeItem("lastStack");
+          localStorage.removeItem("lastIdea");
+          console.log("Cleared localStorage for new chat");
+          window.location.reload();
+        }}
+        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#6ef0c0] text-black font-semibold mb-6"
+      >
         <Plus className="w-4 h-4" />
         New Chat
       </button>

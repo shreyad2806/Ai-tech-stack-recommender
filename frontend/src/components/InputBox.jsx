@@ -1,10 +1,8 @@
 import { useState } from "react";
 import { Command, Sparkles, Rocket, BrainCircuit, Wallet, LineChart, Building2 } from "lucide-react";
 
-export default function InputBox() {
-  const [input, setInput] = useState("");
+export default function InputBox({ input, setInput, result, setResult }) {
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
 
   // Safe result object
@@ -51,6 +49,12 @@ export default function InputBox() {
       };
 
       setResult(normalized);
+      localStorage.setItem("lastStack", JSON.stringify(normalized));
+      localStorage.setItem("lastIdea", input.trim());
+      console.log("Saved to localStorage:", {
+        lastStack: normalized,
+        lastIdea: input.trim(),
+      });
 
     // ✅ ADD THIS (SAVE TO DB)
     try {

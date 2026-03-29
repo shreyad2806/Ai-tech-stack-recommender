@@ -11,6 +11,8 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [user, setUser] = useState(null);
+  const [result, setResult] = useState(null);
+  const [input, setInput] = useState("");
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -28,6 +30,27 @@ export default function Dashboard() {
       setUser(null);
     }
   }, [navigate]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("lastStack");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setResult(parsed);
+        console.log("Restored stack from localStorage:", parsed);
+      } catch (e) {
+        console.error("Failed to load saved stack");
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const savedIdea = localStorage.getItem("lastIdea");
+    if (savedIdea) {
+      setInput(savedIdea);
+      console.log("Restored idea from localStorage:", savedIdea);
+    }
+  }, []);
 
   return (
     <div className="min-h-screen w-full bg-[#050508] flex font-sans overflow-hidden">
@@ -90,7 +113,7 @@ export default function Dashboard() {
               What are you building today?
             </h1>
 
-            <InputBox />
+            <InputBox input={input} setInput={setInput} result={result} setResult={setResult} />
 
           </div>
 
