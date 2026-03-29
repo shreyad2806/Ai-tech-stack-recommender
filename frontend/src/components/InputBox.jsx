@@ -51,6 +51,18 @@ export default function InputBox() {
       };
 
       setResult(normalized);
+
+    // ✅ ADD THIS (SAVE TO DB)
+    try {
+      await fetch("http://127.0.0.1:8000/save-stack", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idea: input, ...normalized }),
+      });
+    } catch (e) {
+      console.error("Save failed:", e);
+    }
+
     } catch (err) {
       console.error("API ERROR:", err);
       setError(err.message || "Something went wrong. Try again.");

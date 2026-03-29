@@ -3,10 +3,14 @@ import json
 import logging
 from typing import Any
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from database import get_db, init_db
+from models import Stack
 
 # ✅ Load ENV
 load_dotenv()
@@ -22,9 +26,8 @@ except Exception as e:
     genai = None
     log.warning("Gemini SDK not importable: %s", e)
 
-# ✅ Load API Key (never log the key)
+# ✅ Load API Key
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-# Stable model ID for AI Studio / v1beta (gemini-1.5-flash often returns 404)
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 model: Any = None
@@ -33,14 +36,7 @@ model: Any = None
 if genai and GEMINI_API_KEY:
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel(
-            GEMINI_MODEL,
-            generation_config={
-                "temperature": 0.9,
-                "top_p": 1,
-                "top_k": 40,
-            },
-        )
+        model = genai.GenerativeModel(GEMINI_MODEL)
         log.info("✅ Gemini model configured: %s", GEMINI_MODEL)
     except Exception as e:
         log.error("❌ Gemini config failed: %s", e)
@@ -48,26 +44,22 @@ if genai and GEMINI_API_KEY:
 else:
     log.warning("⚠️ Gemini not initialized")
 
-log.info(f"Model status: {'ACTIVE' if model else 'NOT ACTIVE'}")
-
 # ✅ FastAPI App
 app = FastAPI(title="StackMind Backend")
 
-# ✅ CORS
-origins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
+# ✅ INIT DB (VERY IMPORTANT)
+init_db()
 
+# ✅ CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ✅ Global Error Handler (must not swallow FastAPI/Starlette HTTPException)
+# ✅ Global Error Handler
 @app.middleware("http")
 async def catch_exceptions(request: Request, call_next):
     try:
@@ -82,7 +74,9 @@ async def catch_exceptions(request: Request, call_next):
 class IdeaRequest(BaseModel):
     idea: str
 
-# ✅ Extract JSON safely
+
+# ------------------ HELPERS ------------------
+
 def extract_json_from_text(text: str):
     try:
         start = text.find("{")
@@ -93,7 +87,7 @@ def extract_json_from_text(text: str):
         return None
     return None
 
-# ✅ Extract Gemini response text
+
 def get_response_text(resp):
     try:
         return resp.text
@@ -103,105 +97,114 @@ def get_response_text(resp):
         except:
             return str(resp)
 
-# ✅ Root
+
+# ------------------ ROUTES ------------------
+
 @app.get("/")
 def root():
     return {"status": "Backend running 🚀"}
 
-# 🚀 MAIN ENDPOINT
+
+# 🚀 RECOMMEND (LLM)
 @app.post("/recommend")
 async def recommend(req: IdeaRequest):
     idea = (req.idea or "").strip()
     log.info(f"📥 Idea: {idea}")
 
     if not model:
-        raise HTTPException(
-            status_code=503,
-            detail="Gemini not configured. Check API key.",
-        )
+        raise HTTPException(503, "Gemini not configured")
 
     prompt = f"""
-You are a senior software architect.
-
 Generate a COMPLETE and UNIQUE tech stack for:
 
 {idea}
 
 Return ONLY JSON:
-
 {{
-  "architecture": "detailed architecture",
-  "core_technologies": ["tech1", "tech2"],
-  "deployment": "deployment strategy",
-  "roadmap": ["step 1", "step 2"]
+  "architecture": "...",
+  "core_technologies": ["..."],
+  "deployment": "...",
+  "roadmap": ["..."]
 }}
-
-Make it:
-- Non-generic
-- Specific
-- Production-ready
 """
 
     try:
         resp = model.generate_content(prompt)
+        raw = get_response_text(resp).strip()
     except Exception as e:
-        log.exception("❌ Gemini failed: %s", e)
-        raise HTTPException(status_code=502, detail=f"Model request failed: {e!s}")
-
-    raw = get_response_text(resp)
-    raw = (raw or "").strip()
-
-    log.info(f"🧠 RAW OUTPUT:\n{raw}")
+        raise HTTPException(502, f"Model failed: {e}")
 
     if not raw:
-        raise HTTPException(status_code=502, detail="Empty response from Gemini")
+        raise HTTPException(502, "Empty model response")
 
-    # ✅ Remove markdown
     if "```" in raw:
-        raw = raw.split("```")[1]
-        raw = raw.replace("json", "").strip()
+        raw = raw.split("```")[1].replace("json", "").strip()
 
-    # ✅ Parse JSON safely
-    try:
-        parsed = extract_json_from_text(raw)
+    parsed = extract_json_from_text(raw)
 
-        if not parsed:
-            raise ValueError("Invalid JSON format")
-
-    except Exception as e:
-        log.warning(f"⚠️ JSON parse failed: {e}")
-
+    if not parsed:
         return {
             "architecture": raw[:500],
             "core_technologies": ["AI-generated"],
-            "deployment": "Generated dynamically",
-            "roadmap": ["See architecture section"],
+            "deployment": "Generated",
+            "roadmap": ["See architecture"],
         }
 
-    architecture = parsed.get("architecture", "")
-    core = parsed.get("core_technologies", [])
-    deployment = parsed.get("deployment", "")
-    roadmap = parsed.get("roadmap", [])
-
-    if not isinstance(core, list):
-        core = [str(core)]
-    if not isinstance(roadmap, list):
-        roadmap = [str(roadmap)]
-
     return {
-        "architecture": architecture,
-        "core_technologies": core,
-        "deployment": deployment,
-        "roadmap": roadmap,
+        "architecture": parsed.get("architecture", ""),
+        "core_technologies": parsed.get("core_technologies", []),
+        "deployment": parsed.get("deployment", ""),
+        "roadmap": parsed.get("roadmap", []),
     }
 
-# ✅ TEMP AUTH (for frontend)
+
+# 💾 SAVE STACK
+@app.post("/save-stack")
+def save_stack(data: dict, db: Session = Depends(get_db)):
+    try:
+        stack = Stack(
+            idea=data.get("idea"),
+            architecture=data.get("architecture"),
+            core_technologies=data.get("core_technologies"),
+            deployment=data.get("deployment"),
+            roadmap=data.get("roadmap"),
+        )
+        db.add(stack)
+        db.commit()
+        db.refresh(stack)
+
+        return {"message": "Saved", "id": stack.id}
+
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+# 📜 GET HISTORY
+@app.get("/stacks")
+def get_stacks(db: Session = Depends(get_db)):
+    stacks = db.query(Stack).order_by(Stack.created_at.desc()).all()
+
+    return [
+        {
+            "id": s.id,
+            "idea": s.idea,
+            "architecture": s.architecture,
+            "core_technologies": s.core_technologies,
+            "deployment": s.deployment,
+            "roadmap": s.roadmap,
+        }
+        for s in stacks
+    ]
+
+
+# 🔐 TEMP AUTH
 @app.post("/login")
 def login():
     return {
         "access_token": "test-token",
         "user": {"email": "test@stackmind.ai"},
     }
+
 
 @app.post("/signup")
 def signup():

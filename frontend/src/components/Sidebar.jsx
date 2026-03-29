@@ -1,6 +1,20 @@
 import { Plus, Search } from "lucide-react";
+import { useEffect, useState } from "react";
 
 export default function Sidebar() {
+  const [history, setHistory] = useState([]);
+
+  // ✅ Fetch history from backend
+  useEffect(() => {
+    fetch("http://127.0.0.1:8000/stacks")
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("History loaded:", data);
+        setHistory(data);
+      })
+      .catch((err) => console.error("History error:", err));
+  }, []);
+
   return (
     <div className="w-[260px] h-screen bg-[#0f0f17] border-r border-white/5 flex flex-col p-4">
 
@@ -25,19 +39,23 @@ export default function Sidebar() {
       </button>
 
       {/* History */}
-      <div className="flex-1">
+      <div className="flex-1 overflow-y-auto">
         <p className="mb-3 text-xs text-gray-500">HISTORY</p>
 
         <div className="space-y-2">
-          <div className="p-2 text-sm text-gray-300 rounded cursor-pointer hover:bg-white/5">
-            E-commerce SaaS
-          </div>
-          <div className="p-2 text-sm text-gray-300 rounded cursor-pointer hover:bg-white/5">
-            FinTech Platform
-          </div>
-          <div className="p-2 text-sm text-gray-300 rounded cursor-pointer hover:bg-white/5">
-            AI Healthcare App
-          </div>
+          {history.length === 0 ? (
+            <p className="text-xs text-gray-500">No history yet</p>
+          ) : (
+            history.map((item) => (
+              <div
+                key={item.id}
+                className="p-2 text-sm text-gray-300 truncate rounded cursor-pointer hover:bg-white/5"
+                title={item.idea}
+              >
+                {item.idea}
+              </div>
+            ))
+          )}
         </div>
       </div>
 
