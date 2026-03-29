@@ -2,12 +2,29 @@ import os
 import json
 import logging
 import asyncio
+import time
+import redis
 from typing import Any
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
+
+# Redis client for distributed caching
+try:
+    redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
+    redis_client.ping()  # Test connection
+    REDIS_AVAILABLE = True
+    print("✅ Redis connected")
+except Exception as e:
+    redis_client = None
+    REDIS_AVAILABLE = False
+    print(f"⚠️ Redis not available: {e}")
+
+# In-memory cache for recommendations with TTL (fallback)
+cache = {}  # {idea: (data, timestamp)}
+CACHE_TTL = 3600  # seconds (1 hour)
 from sqlalchemy.orm import Session
 
 from database import get_db, init_db
@@ -109,8 +126,31 @@ def root():
 # 🚀 RECOMMEND (LLM)
 @app.post("/recommend")
 async def recommend(req: IdeaRequest):
-    idea = (req.idea or "").strip()
+    idea = (req.idea or "").strip().lower()
     log.info(f"📥 Idea: {idea}")
+
+    # Check Redis cache first (if available)
+    if REDIS_AVAILABLE and redis_client:
+        try:
+            cached = redis_client.get(idea)
+            if cached:
+                print("⚡ Redis Cache HIT")
+                return json.loads(cached)
+        except Exception as e:
+            print(f"⚠️ Redis error: {e}")
+
+    # Check in-memory cache with TTL (fallback)
+    current_time = time.time()
+    if idea in cache:
+        cached_data, timestamp = cache[idea]
+        if current_time - timestamp < CACHE_TTL:
+            print("⚡ Memory Cache HIT")
+            return cached_data
+        else:
+            print("⏳ Memory Cache expired")
+            del cache[idea]
+    
+    print("🧠 Cache MISS → calling Gemini")
 
     if not model:
         raise HTTPException(503, "Gemini not configured")
@@ -144,19 +184,44 @@ Return ONLY JSON:
     parsed = extract_json_from_text(raw)
 
     if not parsed:
-        return {
+        result = {
             "architecture": raw[:500],
             "core_technologies": ["AI-generated"],
             "deployment": "Generated",
             "roadmap": ["See architecture"],
         }
+        
+        # Store in Redis (if available)
+        if REDIS_AVAILABLE and redis_client:
+            try:
+                redis_client.setex(idea, CACHE_TTL, json.dumps(result))
+                print("💾 Saved to Redis")
+            except Exception as e:
+                print(f"⚠️ Redis save error: {e}")
+        
+        # Store in memory cache with timestamp
+        cache[idea] = (result, current_time)
+        return result
 
-    return {
+    result = {
         "architecture": parsed.get("architecture", ""),
         "core_technologies": parsed.get("core_technologies", []),
         "deployment": parsed.get("deployment", ""),
         "roadmap": parsed.get("roadmap", []),
     }
+    
+    # Store in Redis (if available)
+    if REDIS_AVAILABLE and redis_client:
+        try:
+            redis_client.setex(idea, CACHE_TTL, json.dumps(result))
+            print("💾 Saved to Redis")
+        except Exception as e:
+            print(f"⚠️ Redis save error: {e}")
+    
+    # Store in memory cache with timestamp
+    cache[idea] = (result, current_time)
+    
+    return result
 
 @app.post("/recommend-stream")
 async def recommend_stream(data: IdeaRequest):
