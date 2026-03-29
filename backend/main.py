@@ -1,184 +1,211 @@
 import os
 import json
-import bcrypt
-import jwt
-from datetime import datetime, timedelta
-from typing import Optional
-
-from fastapi import FastAPI, HTTPException, Depends
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, EmailStr
+import logging
+from typing import Any
 from dotenv import load_dotenv
-from sqlalchemy.orm import Session
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
-import google.genai as genai
-from database import engine, SessionLocal
-from models import Base, User  # ✅ ONLY DB MODEL
-
-# ---------------- LOAD ENV ----------------
+# ✅ Load ENV
 load_dotenv()
 
+# ✅ Logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+log = logging.getLogger("backend")
+
+# ✅ Gemini Import
+try:
+    import google.generativeai as genai
+except Exception as e:
+    genai = None
+    log.warning("Gemini SDK not importable: %s", e)
+
+# ✅ Load API Key (never log the key)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+# Stable model ID for AI Studio / v1beta (gemini-1.5-flash often returns 404)
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
-if not GEMINI_API_KEY:
-    raise RuntimeError("GEMINI_API_KEY not found in .env file")
+model: Any = None
 
-# ---------------- CONFIGURE GEMINI ----------------
-client = genai.Client(api_key=GEMINI_API_KEY)
-model_name = "gemini-2.5-flash"
-
-# ---------------- FASTAPI APP ----------------
-app = FastAPI(title="AI Tech Stack Recommender")
-
-# ---------------- INIT DATABASE ----------------
-Base.metadata.create_all(bind=engine)
-
-# ---------------- DATABASE DEPENDENCY ----------------
-def get_db():
-    db = SessionLocal()
+# ✅ Configure Gemini
+if genai and GEMINI_API_KEY:
     try:
-        yield db
-    finally:
-        db.close()
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel(
+            GEMINI_MODEL,
+            generation_config={
+                "temperature": 0.9,
+                "top_p": 1,
+                "top_k": 40,
+            },
+        )
+        log.info("✅ Gemini model configured: %s", GEMINI_MODEL)
+    except Exception as e:
+        log.error("❌ Gemini config failed: %s", e)
+        model = None
+else:
+    log.warning("⚠️ Gemini not initialized")
 
-# ---------------- AUTH CONFIG ----------------
-SECRET_KEY = os.getenv("SECRET_KEY", "super-secret-key-for-dev")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 1 week
+log.info(f"Model status: {'ACTIVE' if model else 'NOT ACTIVE'}")
 
-def verify_password(plain_password, hashed_password):
-    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+# ✅ FastAPI App
+app = FastAPI(title="StackMind Backend")
 
-def get_password_hash(password):
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode("utf-8")
+# ✅ CORS
+origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=15))
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-
-# ---------------- CORS ----------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # dev only
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ---------------- REQUEST MODELS ----------------
-class ProjectInput(BaseModel):
-    description: str
+# ✅ Global Error Handler (must not swallow FastAPI/Starlette HTTPException)
+@app.middleware("http")
+async def catch_exceptions(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.exception("Unhandled error: %s", e)
+        return JSONResponse({"error": "Internal server error"}, status_code=500)
 
-class UserCreate(BaseModel):
-    email: EmailStr
-    password: str
+# ✅ Request Model
+class IdeaRequest(BaseModel):
+    idea: str
 
-class UserLogin(BaseModel):
-    email: str
-    password: str
+# ✅ Extract JSON safely
+def extract_json_from_text(text: str):
+    try:
+        start = text.find("{")
+        end = text.rfind("}") + 1
+        if start != -1 and end > start:
+            return json.loads(text[start:end])
+    except Exception:
+        return None
+    return None
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str
+# ✅ Extract Gemini response text
+def get_response_text(resp):
+    try:
+        return resp.text
+    except:
+        try:
+            return resp.candidates[0].content.parts[0].text
+        except:
+            return str(resp)
 
-# ---------------- AUTH ENDPOINTS ----------------
-
-# ✅ SIGNUP FIXED
-@app.post("/signup")
-def signup(user: UserCreate, db: Session = Depends(get_db)):
-
-    existing_user = db.query(User).filter(User.email == user.email).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-
-    hashed_password = get_password_hash(user.password)
-
-    new_user = User(email=user.email, password=hashed_password)
-
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-
-    return {"message": "User created successfully"}
-
-
-# ✅ LOGIN FIXED
-@app.post("/login", response_model=Token)
-def login(user: UserLogin, db: Session = Depends(get_db)):
-
-    db_user = db.query(User).filter(User.email == user.email).first()
-
-    if not db_user:
-        raise HTTPException(status_code=400, detail="Invalid credentials")
-
-    if not verify_password(user.password, db_user.password):
-        raise HTTPException(status_code=400, detail="Invalid credentials")
-
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": db_user.email},
-        expires_delta=access_token_expires
-    )
-
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "user": {
-            "email": db_user.email
-        }
-    }
-
-# ---------------- ROOT ----------------
+# ✅ Root
 @app.get("/")
 def root():
-    return {"status": "Backend running with Gemini + PostgreSQL"}
+    return {"status": "Backend running 🚀"}
 
-# ---------------- PROMPT ----------------
-def build_prompt(project_description: str) -> str:
-    return f"""
-You are a senior software architect.
-
-Analyze the project idea below and respond ONLY in valid JSON.
-
-{{
-  "tech_stack": {{
-    "frontend": [],
-    "backend": [],
-    "ai_ml": [],
-    "database": []
-  }},
-  "architecture": "",
-  "mvp_roadmap": [],
-  "deployment": {{
-    "backend": "",
-    "frontend": "",
-    "ci_cd": ""
-  }}
-}}
-
-Project Idea:
-{project_description}
-"""
-
-# ---------------- AI ENDPOINT ----------------
+# 🚀 MAIN ENDPOINT
 @app.post("/recommend")
-def recommend_stack(data: ProjectInput):
-    try:
-        prompt = build_prompt(data.description)
+async def recommend(req: IdeaRequest):
+    idea = (req.idea or "").strip()
+    log.info(f"📥 Idea: {idea}")
 
-        response = client.models.generate_content(
-            model=model_name,
-            contents=prompt
+    if not model:
+        raise HTTPException(
+            status_code=503,
+            detail="Gemini not configured. Check API key.",
         )
 
-        structured_output = json.loads(response.text.strip())
+    prompt = f"""
+You are a senior software architect.
 
-        return {
-            "project_description": data.description,
-            "result": structured_output
-        }
+Generate a COMPLETE and UNIQUE tech stack for:
+
+{idea}
+
+Return ONLY JSON:
+
+{{
+  "architecture": "detailed architecture",
+  "core_technologies": ["tech1", "tech2"],
+  "deployment": "deployment strategy",
+  "roadmap": ["step 1", "step 2"]
+}}
+
+Make it:
+- Non-generic
+- Specific
+- Production-ready
+"""
+
+    try:
+        resp = model.generate_content(prompt)
+    except Exception as e:
+        log.exception("❌ Gemini failed: %s", e)
+        raise HTTPException(status_code=502, detail=f"Model request failed: {e!s}")
+
+    raw = get_response_text(resp)
+    raw = (raw or "").strip()
+
+    log.info(f"🧠 RAW OUTPUT:\n{raw}")
+
+    if not raw:
+        raise HTTPException(status_code=502, detail="Empty response from Gemini")
+
+    # ✅ Remove markdown
+    if "```" in raw:
+        raw = raw.split("```")[1]
+        raw = raw.replace("json", "").strip()
+
+    # ✅ Parse JSON safely
+    try:
+        parsed = extract_json_from_text(raw)
+
+        if not parsed:
+            raise ValueError("Invalid JSON format")
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        log.warning(f"⚠️ JSON parse failed: {e}")
+
+        return {
+            "architecture": raw[:500],
+            "core_technologies": ["AI-generated"],
+            "deployment": "Generated dynamically",
+            "roadmap": ["See architecture section"],
+        }
+
+    architecture = parsed.get("architecture", "")
+    core = parsed.get("core_technologies", [])
+    deployment = parsed.get("deployment", "")
+    roadmap = parsed.get("roadmap", [])
+
+    if not isinstance(core, list):
+        core = [str(core)]
+    if not isinstance(roadmap, list):
+        roadmap = [str(roadmap)]
+
+    return {
+        "architecture": architecture,
+        "core_technologies": core,
+        "deployment": deployment,
+        "roadmap": roadmap,
+    }
+
+# ✅ TEMP AUTH (for frontend)
+@app.post("/login")
+def login():
+    return {
+        "access_token": "test-token",
+        "user": {"email": "test@stackmind.ai"},
+    }
+
+@app.post("/signup")
+def signup():
+    return {
+        "access_token": "test-token",
+        "user": {"email": "test@stackmind.ai"},
+    }

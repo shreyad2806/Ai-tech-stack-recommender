@@ -14,19 +14,29 @@ export default function Auth() {
 
   const handleSignup = async () => {
     try {
-      await fetch("http://localhost:8000/signup", {
+      await fetch("http://127.0.0.1:8000/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
-      const res = await fetch("http://localhost:8000/login", {
+      const res = await fetch("http://127.0.0.1:8000/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        console.error("Invalid JSON response during signup login", e);
+        data = { error: "Invalid response from server" };
+      }
+
+      if (!res.ok || data.error) {
+        throw new Error(data.error || "Login failed after signup");
+      }
 
       localStorage.setItem("token", data.access_token);
       localStorage.setItem("user", JSON.stringify(data.user));
@@ -40,13 +50,23 @@ export default function Auth() {
 
   const handleLogin = async () => {
     try {
-      const res = await fetch("http://localhost:8000/login", {
+      const res = await fetch("http://127.0.0.1:8000/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        console.error("Invalid JSON response during login", e);
+        data = { error: "Invalid response from server" };
+      }
+
+      if (!res.ok || data.error) {
+        throw new Error(data.error || "Login failed");
+      }
 
       localStorage.setItem("token", data.access_token);
       localStorage.setItem("user", JSON.stringify(data.user));

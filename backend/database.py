@@ -1,9 +1,14 @@
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from dotenv import load_dotenv
 
-# Database connection string
-DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/aitech"
+# Load environment variables from .env (if present)
+load_dotenv()
+
+# Database connection string (fall back to sensible default)
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/aitech")
 
 # Create engine
 engine = create_engine(DATABASE_URL)
