@@ -37,6 +37,6 @@ def get_db():
 
 # ✅ IMPORTANT: CREATE TABLES
 def init_db():
-    from models import User, Stack  # 👈 ensures models are registered
+    from models import User, Stack, StackShare  # 👈 ensures models are registered
     Base.metadata.create_all(bind=engine)
     

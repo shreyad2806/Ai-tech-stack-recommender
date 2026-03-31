@@ -1,24 +1,36 @@
+import { useState } from "react";
 import { 
   ArrowRight,
   Bot,
   BrainCircuit,
   Building2,
+  CheckCircle,
   CheckCircle2,
+  Code,
   Code2,
   Cpu,
   Database,
+  Download,
+  ExternalLink,
   Globe,
+  Key,
   Layers,
   LineChart,
   Loader2,
-  Network,
   Rocket,
   Server,
+  Share,
   Target,
   Terminal,
   Wallet,
-  Cloud
+  Zap,
+  Cloud,
+  AlertCircle  
 } from "lucide-react";
+
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+import ArchitectureDiagram from "./ArchitectureDiagram";
 
 // 🛡️ SAFE DATA PARSING - Step 1: Fix data handling
 const safeParseResult = (result) => {
@@ -118,77 +130,6 @@ const getCategoryIcon = (category) => {
   return icons[category] || icons.other;
 };
 
-// 🏗️ ARCHITECTURE DIAGRAM - Step 7: Visual flow diagram
-const ArchitectureDiagram = ({ architecture }) => {
-  const flowSteps = [
-    { icon: Globe, label: "User", color: "blue" },
-    { icon: Code2, label: "Frontend", color: "cyan" },
-    { icon: Terminal, label: "Backend", color: "green" },
-    { icon: Cpu, label: "AI Core", color: "purple", highlight: true },
-    { icon: Database, label: "Database", color: "orange" }
-  ];
-
-  return (
-    <div className="bg-gradient-to-br from-[#1a1a2e] to-[#16162a] rounded-xl p-5 border border-gray-800/50">
-      <h4 className="text-sm font-semibold text-gray-400 mb-4 flex items-center gap-2">
-        <Server className="w-4 h-4" />
-        System Flow
-      </h4>
-      
-      {/* Flow Diagram */}
-      <div className="flex items-center justify-between gap-2 mb-6">
-        {flowSteps.map((step, index) => (
-          <div key={step.label} className="flex items-center gap-2">
-            <div className={`
-              flex flex-col items-center gap-1.5
-              ${step.highlight ? 'scale-110' : ''}
-            `}>
-              <div className={`
-                w-12 h-12 rounded-lg flex items-center justify-center
-                bg-gradient-to-br ${step.highlight 
-                  ? 'from-purple-500/30 to-pink-500/30 border-2 border-purple-400/50 shadow-lg shadow-purple-500/20' 
-                  : 'from-gray-700/50 to-gray-800/50 border border-gray-700'
-                }
-              `}>
-                <step.icon className={`w-5 h-5 ${step.highlight ? 'text-purple-300' : 'text-gray-400'}`} />
-              </div>
-              <span className={`text-xs ${step.highlight ? 'text-purple-300 font-medium' : 'text-gray-500'}`}>
-                {step.label}
-              </span>
-            </div>
-            {index < flowSteps.length - 1 && (
-              <ArrowRight className="w-4 h-4 text-gray-600 mx-1" />
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* AI Pipeline Detail */}
-      {architecture && (
-        <div className="border-t border-gray-800/50 pt-4">
-          <h4 className="text-xs font-medium text-purple-400/80 mb-3 flex items-center gap-2">
-            <Cpu className="w-3 h-3" />
-            AI Processing Pipeline
-          </h4>
-          <div className="flex items-center justify-center gap-3 text-xs">
-            <div className="px-3 py-1.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-300">
-              Input
-            </div>
-            <ArrowRight className="w-3 h-3 text-gray-600" />
-            <div className="px-3 py-1.5 rounded-md bg-purple-500/20 border border-purple-500/30 text-purple-300 font-medium">
-              LLM
-            </div>
-            <ArrowRight className="w-3 h-3 text-gray-600" />
-            <div className="px-3 py-1.5 rounded-md bg-green-500/10 border border-green-500/20 text-green-300">
-              Output
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
 // 🗺️ ROADMAP - Step 8: Timeline UI
 const RoadmapTimeline = ({ steps }) => {
   if (!Array.isArray(steps) || steps.length === 0) return null;
@@ -219,55 +160,6 @@ const RoadmapTimeline = ({ steps }) => {
           </div>
         );
       })}
-    </div>
-  );
-};
-
-// 🎯 ENHANCED DIAGRAM COMPONENT
-const EnhancedDiagram = ({ diagram }) => {
-  if (!diagram?.nodes || !Array.isArray(diagram.nodes) || diagram.nodes.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="bg-[#0f172a] rounded-lg p-4 border border-gray-800">
-      <h4 className="text-sm font-medium text-gray-400 mb-4">System Architecture</h4>
-      
-      {/* Nodes */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-        {diagram.nodes.map((node) => (
-          <div
-            key={node.id}
-            className={`
-              p-3 rounded-lg border text-center
-              ${node.type === 'component' ? 'bg-blue-500/10 border-blue-500/30 text-blue-300' : ''}
-              ${node.type === 'service' ? 'bg-green-500/10 border-green-500/30 text-green-300' : ''}
-              ${node.type === 'data' ? 'bg-orange-500/10 border-orange-500/30 text-orange-300' : ''}
-              ${!node.type ? 'bg-gray-500/10 border-gray-500/30 text-gray-300' : ''}
-            `}
-          >
-            <div className="font-medium text-sm">{node.label}</div>
-            <div className="text-xs opacity-75 mt-1">{node.type}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Connections */}
-      {diagram.edges && Array.isArray(diagram.edges) && diagram.edges.length > 0 && (
-        <div className="space-y-2">
-          <h5 className="text-xs font-medium text-gray-500 uppercase">Connections</h5>
-          {diagram.edges.map((edge, index) => (
-            <div key={index} className="flex items-center gap-2 text-xs">
-              <span className="text-blue-400">{edge.from}</span>
-              <ArrowRight className="w-3 h-3 text-gray-500" />
-              <span className="text-green-400">{edge.to}</span>
-              {edge.label && (
-                <span className="text-gray-500 ml-2">({edge.label})</span>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 };
@@ -312,24 +204,103 @@ const StartupRoadmap = ({ phases }) => {
   );
 };
 
-// ☁️ DEPLOYMENT PLAN COMPONENT
+// ☁️ DEPLOYMENT PLAN COMPONENT - Beginner Friendly
 const DeploymentPlan = ({ deployment }) => {
-  if (!deployment || typeof deployment !== 'object' || Object.keys(deployment).length === 0) {
-    return null;
-  }
+  // Default beginner-friendly deployment data
+  const defaultDeployment = {
+    frontend: "Deploy on Vercel (free, fast, ideal for React apps)",
+    backend: "Deploy on Render / Railway (easy Python/FastAPI hosting)",
+    database: "Use Supabase / Firebase (no setup, free tier)",
+    ai_model: "Use API-based models (Gemini / OpenAI)",
+    quick_start: "For demo projects, use Streamlit for full app deployment"
+  };
+
+  const deployData = deployment && Object.keys(deployment).length > 0 
+    ? deployment 
+    : defaultDeployment;
+
+  // Service icons and colors
+  const serviceConfig = {
+    frontend: { icon: Code2, color: "blue", label: "Frontend" },
+    backend: { icon: Server, color: "green", label: "Backend" },
+    database: { icon: Database, color: "orange", label: "Database" },
+    ai_model: { icon: Cpu, color: "purple", label: "AI Model" },
+    quick_start: { icon: Zap, color: "yellow", label: "Quick Demo" }
+  };
+
+  const getColorClasses = (color) => {
+    const colors = {
+      blue: "bg-blue-500/10 border-blue-500/30 text-blue-300",
+      green: "bg-green-500/10 border-green-500/30 text-green-300",
+      orange: "bg-orange-500/10 border-orange-500/30 text-orange-300",
+      purple: "bg-purple-500/10 border-purple-500/30 text-purple-300",
+      yellow: "bg-yellow-500/10 border-yellow-500/30 text-yellow-300"
+    };
+    return colors[color] || colors.blue;
+  };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {Object.entries(deployment).map(([key, value]) => (
-        <div key={key} className="bg-[#0f172a] rounded-lg p-4 border border-gray-800">
-          <h5 className="text-sm font-medium text-cyan-400 capitalize mb-2">
-            {key.replace(/_/g, ' ')}
-          </h5>
-          <p className="text-gray-300 text-sm">
-            {typeof value === 'object' ? JSON.stringify(value) : value}
+    <div className="space-y-6">
+      {/* Service Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {Object.entries(deployData).map(([key, value]) => {
+          const config = serviceConfig[key] || { icon: Cloud, color: "blue", label: key };
+          const Icon = config.icon;
+          
+          return (
+            <div 
+              key={key} 
+              className={`rounded-lg p-4 border ${getColorClasses(config.color)} transition-all hover:scale-[1.02]`}
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <div className={`p-2 rounded-md bg-${config.color}-500/20`}>
+                  <Icon className="w-5 h-5" />
+                </div>
+                <h5 className="font-semibold text-white capitalize">
+                  {config.label}
+                </h5>
+              </div>
+              <p className="text-sm text-gray-300 leading-relaxed">
+                {typeof value === 'object' ? JSON.stringify(value) : value}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Quick Deploy Section */}
+      <div className="bg-gradient-to-r from-cyan-500/10 to-blue-500/10 rounded-xl p-5 border border-cyan-500/30">
+        <div className="flex items-center gap-3 mb-4">
+          <Rocket className="w-6 h-6 text-cyan-400" />
+          <h4 className="text-lg font-semibold text-white">Quick Deploy (1-day setup)</h4>
+        </div>
+        
+        <div className="space-y-3">
+          {[
+            { step: 1, text: "Push code to GitHub", icon: Code },
+            { step: 2, text: "Deploy frontend on Vercel", icon: ExternalLink },
+            { step: 3, text: "Deploy backend on Render", icon: Server },
+            { step: 4, text: "Connect API keys", icon: Key },
+            { step: 5, text: "Go live!", icon: Globe }
+          ].map(({ step, text, icon: Icon }) => (
+            <div key={step} className="flex items-center gap-4">
+              <div className="w-8 h-8 rounded-full bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-300 font-semibold text-sm">
+                {step}
+              </div>
+              <div className="flex items-center gap-2 text-gray-300">
+                <Icon className="w-4 h-4 text-gray-500" />
+                <span className="text-sm">{text}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        <div className="mt-4 pt-4 border-t border-cyan-500/20">
+          <p className="text-xs text-gray-400">
+            Perfect for college projects, hackathons, and portfolio demos. No DevOps experience needed!
           </p>
         </div>
-      ))}
+      </div>
     </div>
   );
 };
@@ -460,6 +431,77 @@ export default function InputBox({ input, setInput, result, setResult }) {
     }
   };
 
+  // 📄 EXPORT PDF
+  const handleExportPDF = async () => {
+    const element = document.getElementById("export-section");
+    if (!element) return;
+
+    try {
+      // Show loading state
+      const originalOverflow = element.style.overflow;
+      element.style.overflow = "visible";
+
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: "#0f172a", // Dark background
+        logging: false,
+      });
+
+      // Restore original state
+      element.style.overflow = originalOverflow;
+
+      const imgData = canvas.toDataURL("image/png");
+      
+      const pdf = new jsPDF("p", "mm", "a4");
+      
+      const pdfWidth = 210; // A4 width in mm
+      const pdfHeight = 297; // A4 height in mm
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+      
+      const imgX = (pdfWidth - imgWidth * ratio) / 2;
+      const imgY = 20; // Top margin
+
+      // Add watermark
+      pdf.setFontSize(10);
+      pdf.setTextColor(150);
+      pdf.text("Generated by StackMind", pdfWidth - 60, pdfHeight - 10);
+
+      // Add image
+      pdf.addImage(imgData, "PNG", imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+      
+      pdf.save("tech-stack.pdf");
+    } catch (err) {
+      console.error("PDF export failed:", err);
+      alert("Failed to export PDF. Please try again.");
+    }
+  };
+
+  // 🔗 SHARE STACK
+  const handleShare = async () => {
+    try {
+      const res = await fetch("http://127.0.0.1:8000/share", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(result),
+      });
+
+      if (!res.ok) throw new Error("Failed to share");
+
+      const data = await res.json();
+      const shareUrl = `${window.location.origin}/share/${data.id}`;
+
+      navigator.clipboard.writeText(shareUrl);
+      alert("Shareable link copied to clipboard!");
+    } catch (err) {
+      console.error("Share failed:", err);
+      alert("Failed to share. Please try again.");
+    }
+  };
+
   const quickTags = [
     { name: "Startup", icon: Rocket, color: "from-cyan-500/20 to-blue-500/20" },
     { name: "AI / ML", icon: BrainCircuit, color: "from-purple-500/20 to-pink-500/20" },
@@ -559,11 +601,37 @@ export default function InputBox({ input, setInput, result, setResult }) {
 
       {/* ✅ RESULTS DASHBOARD */}
       {safeResult && (
-        <div className="space-y-6">
-          {/* Header */}
-          <div className="flex items-center gap-3 text-emerald-400">
-            <CheckCircle2 className="w-6 h-6" />
-            <span className="font-semibold">Your Tech Stack is Ready</span>
+        <div id="export-section" className="space-y-6">
+          {/* Header with Export Button */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 text-emerald-400">
+              <CheckCircle2 className="w-6 h-6" />
+              <span className="font-semibold">Your Tech Stack is Ready</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleShare}
+                className="
+                  flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm
+                  bg-blue-600 hover:bg-blue-500 text-white border border-blue-500
+                  transition-all hover:scale-105
+                "
+              >
+                <Share className="w-4 h-4" />
+                Share
+              </button>
+              <button
+                onClick={handleExportPDF}
+                className="
+                  flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm
+                  bg-gray-800 hover:bg-gray-700 text-white border border-gray-700
+                  transition-all hover:scale-105
+                "
+              >
+                <Download className="w-4 h-4" />
+                Export PDF
+              </button>
+            </div>
           </div>
 
           {/* Architecture Card */}
@@ -595,24 +663,6 @@ export default function InputBox({ input, setInput, result, setResult }) {
             )}
           </Card>
 
-          {/* Deployment Card */}
-          <Card title="Deployment Strategy" icon={Cloud}>
-            {safeResult.deployment ? (
-              <div className="text-gray-300 leading-relaxed">
-                {typeof safeResult.deployment === "object" 
-                  ? Object.entries(safeResult.deployment).map(([key, value]) => (
-                      <div key={key} className="mb-2">
-                        <span className="font-semibold text-cyan-400">{key}:</span>{" "}
-                        <span>{typeof value === "object" ? JSON.stringify(value) : value}</span>
-                      </div>
-                    ))
-                  : safeResult.deployment}
-              </div>
-            ) : (
-              <p className="text-gray-500 italic">No deployment strategy provided</p>
-            )}
-          </Card>
-
           {/* Roadmap Card */}
           <Card title="Implementation Roadmap" icon={CheckCircle2}>
             {safeResult.roadmap && safeResult.roadmap.length > 0 ? (
@@ -621,15 +671,6 @@ export default function InputBox({ input, setInput, result, setResult }) {
               <p className="text-gray-500 italic">No roadmap provided</p>
             )}
           </Card>
-
-          {/* NEW ENHANCED SECTIONS */}
-          
-          {/* Enhanced Architecture Diagram */}
-          {safeResult.architecture_diagram && (
-            <Card title="Enhanced Diagram" icon={Network}>
-              <EnhancedDiagram diagram={safeResult.architecture_diagram} />
-            </Card>
-          )}
 
           {/* Startup Roadmap Phases */}
           {safeResult.roadmap_phases && safeResult.roadmap_phases.length > 0 && (

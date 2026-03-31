@@ -67,6 +67,14 @@ export default function Dashboard() {
     }
   }, [authChecked]);
 
+  // Dynamic greeting function
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 18) return "Good afternoon";
+    return "Good evening";
+  };
+
   // Click outside handler for dropdown
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -179,18 +187,17 @@ export default function Dashboard() {
 
           <div className="w-full max-w-4xl mx-auto">
 
-            <p className="mb-2 text-gray-300">
-              Good afternoon, {(() => {
-                const email = user?.email;
-                if (typeof email === 'string') return email.split('@')[0];
-                if (typeof email === 'object' && email !== null) return String(email.name || email.username || "User");
-                return "User";
-              })()}
+            <p className="mb-2 text-gray-400">
+              {getGreeting()}
             </p>
 
             <h1 className="mb-4 text-5xl font-bold text-white leading-tight">
               What are you <span className="bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent">building</span> today?
             </h1>
+
+            <p className="text-gray-400 mt-2 max-w-2xl">
+              Describe your idea in plain language — StackMind will recommend your full tech stack, architecture, and deployment strategy in seconds.
+            </p>
 
             {/* Debug: Show user data structure in development */}
             {process.env.NODE_ENV === 'development' && (

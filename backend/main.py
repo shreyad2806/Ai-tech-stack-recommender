@@ -451,3 +451,46 @@ def signup():
         "access_token": "test-token",
         "user": {"email": "test@stackmind.ai"},
     }
+
+
+# 🔗 SHARE STACK ENDPOINTS (NEW)
+@app.post("/share")
+def share_stack(data: dict, db: Session = Depends(get_db)):
+    """Save stack data and return shareable ID."""
+    try:
+        from models import StackShare
+        
+        share = StackShare(
+            data=data  # Store the entire stack result as JSON
+        )
+        db.add(share)
+        db.commit()
+        db.refresh(share)
+
+        return {"id": share.id, "message": "Stack shared successfully"}
+
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.get("/share/{share_id}")
+def get_shared_stack(share_id: str, db: Session = Depends(get_db)):
+    """Retrieve shared stack by ID."""
+    try:
+        from models import StackShare
+        
+        share = db.query(StackShare).filter(StackShare.id == share_id).first()
+        
+        if not share:
+            raise HTTPException(404, "Shared stack not found")
+
+        return {
+            "id": share.id,
+            "data": share.data,
+            "created_at": share.created_at.isoformat() if share.created_at else None
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
