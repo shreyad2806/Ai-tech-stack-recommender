@@ -32,6 +32,9 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import ArchitectureDiagram from "./ArchitectureDiagram";
 
+// 🌐 API Configuration
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
 // 🛡️ SAFE DATA PARSING - Step 1: Fix data handling
 const safeParseResult = (result) => {
   if (!result) return null;
@@ -390,9 +393,9 @@ export default function InputBox({ input, setInput, result, setResult }) {
     setResult(null);
 
     try {
-      console.log("📤 Sending request to backend...");
+      if (import.meta.env.DEV) console.log("📤 Sending request to backend...");
       
-      const res = await fetch("http://127.0.0.1:8000/recommend", {
+      const res = await fetch(`${API_URL}/recommend`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -402,20 +405,20 @@ export default function InputBox({ input, setInput, result, setResult }) {
 
       // STEP 8: LOG RAW API RESPONSE
       const text = await res.text();
-      console.log("API RAW:", text);
+      if (import.meta.env.DEV) console.log("API RAW:", text);
 
       let data;
       try {
         data = JSON.parse(text);
-        console.log("✅ Parsed JSON:", data);
+        if (import.meta.env.DEV) console.log("✅ Parsed JSON:", data);
       } catch (parseErr) {
-        console.error("❌ Invalid JSON from backend:", parseErr);
+        if (import.meta.env.DEV) console.error("❌ Invalid JSON from backend:", parseErr);
         throw new Error("Invalid JSON from backend");
       }
       
       // 🛡️ Ensure data is properly structured
       const normalized = safeParseResult(data);
-      console.log("Normalized result:", normalized);
+      if (import.meta.env.DEV) console.log("Normalized result:", normalized);
       
       setResult(normalized);
 
@@ -424,7 +427,7 @@ export default function InputBox({ input, setInput, result, setResult }) {
       localStorage.setItem("lastIdea", idea);
 
     } catch (err) {
-      console.error("Frontend error:", err);
+      if (import.meta.env.DEV) console.error("Frontend error:", err);
       setError("Failed to generate. Please try again.");
     } finally {
       setLoading(false);
@@ -483,7 +486,7 @@ export default function InputBox({ input, setInput, result, setResult }) {
   // 🔗 SHARE STACK
   const handleShare = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:8000/share", {
+      const res = await fetch(`${API_URL}/share`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(result),
@@ -497,7 +500,7 @@ export default function InputBox({ input, setInput, result, setResult }) {
       navigator.clipboard.writeText(shareUrl);
       alert("Shareable link copied to clipboard!");
     } catch (err) {
-      console.error("Share failed:", err);
+      if (import.meta.env.DEV) console.error("Share failed:", err);
       alert("Failed to share. Please try again.");
     }
   };

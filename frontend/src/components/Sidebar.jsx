@@ -1,18 +1,23 @@
 import { Plus, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 
+// 🌐 API Configuration
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
 export default function Sidebar() {
   const [history, setHistory] = useState([]);
 
   // ✅ Fetch history from backend
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/stacks")
+    fetch(`${API_URL}/stacks`)
       .then((res) => res.json())
       .then((data) => {
-        console.log("History loaded:", data);
+        if (import.meta.env.DEV) console.log("History loaded:", data);
         setHistory(data);
       })
-      .catch((err) => console.error("History error:", err));
+      .catch((err) => {
+        if (import.meta.env.DEV) console.error("History error:", err);
+      });
   }, []);
 
   return (
@@ -37,7 +42,7 @@ export default function Sidebar() {
         onClick={() => {
           localStorage.removeItem("lastStack");
           localStorage.removeItem("lastIdea");
-          console.log("Cleared localStorage for new chat");
+          if (import.meta.env.DEV) console.log("Cleared localStorage for new chat");
           window.location.reload();
         }}
         className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#6ef0c0] text-black font-semibold mb-6"

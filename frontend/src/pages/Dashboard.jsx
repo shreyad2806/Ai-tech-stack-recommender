@@ -16,15 +16,15 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
 
-  console.log("Dashboard: Rendering", { user, isLoading, authChecked });
+  if (import.meta.env.DEV) console.log("Dashboard: Rendering", { user, isLoading, authChecked });
 
   // Auth check on mount
   useEffect(() => {
-    console.log("Dashboard: Checking auth...");
+    if (import.meta.env.DEV) console.log("Dashboard: Checking auth...");
     const token = localStorage.getItem("token");
 
     if (!token) {
-      console.log("Dashboard: No token found, redirecting to auth");
+      if (import.meta.env.DEV) console.log("Dashboard: No token found, redirecting to auth");
       navigate("/auth");
       return;
     }
@@ -32,10 +32,10 @@ export default function Dashboard() {
     const raw = localStorage.getItem("user") || "null";
     try {
       const parsedUser = JSON.parse(raw);
-      console.log("Dashboard: User loaded:", parsedUser);
+      if (import.meta.env.DEV) console.log("Dashboard: User loaded:", parsedUser);
       setUser(parsedUser);
     } catch (error) {
-      console.error("Dashboard: Error parsing user data:", error);
+      if (import.meta.env.DEV) console.error("Dashboard: Error parsing user data:", error);
       setUser(null);
     }
     
@@ -47,23 +47,23 @@ export default function Dashboard() {
   useEffect(() => {
     if (!authChecked) return;
     
-    console.log("Dashboard: Loading saved data...");
+    if (import.meta.env.DEV) console.log("Dashboard: Loading saved data...");
     
     const saved = localStorage.getItem("lastStack");
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         setResult(parsed);
-        console.log("Dashboard: Restored stack from localStorage:", parsed);
+        if (import.meta.env.DEV) console.log("Dashboard: Restored stack from localStorage:", parsed);
       } catch (e) {
-        console.error("Dashboard: Failed to load saved stack", e);
+        if (import.meta.env.DEV) console.error("Dashboard: Failed to load saved stack", e);
       }
     }
 
     const savedIdea = localStorage.getItem("lastIdea");
     if (savedIdea) {
       setInput(savedIdea);
-      console.log("Dashboard: Restored idea from localStorage:", savedIdea);
+      if (import.meta.env.DEV) console.log("Dashboard: Restored idea from localStorage:", savedIdea);
     }
   }, [authChecked]);
 
@@ -89,7 +89,7 @@ export default function Dashboard() {
 
   // Show loading state while checking auth
   if (isLoading) {
-    console.log("Dashboard: Showing loading state");
+    if (import.meta.env.DEV) console.log("Dashboard: Showing loading state");
     return (
       <div className="min-h-screen w-full bg-[#050508] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -102,7 +102,7 @@ export default function Dashboard() {
 
   // If no user after auth check, show error or redirect
   if (!user) {
-    console.log("Dashboard: No user found after auth check");
+    if (import.meta.env.DEV) console.log("Dashboard: No user found after auth check");
     return (
       <div className="min-h-screen w-full bg-[#050508] flex items-center justify-center">
         <div className="bg-[#111827] border border-red-800 rounded-xl p-8 max-w-md text-center">
@@ -119,7 +119,7 @@ export default function Dashboard() {
     );
   }
 
-  console.log("Dashboard: Rendering main content", { userEmail: user?.email });
+  if (import.meta.env.DEV) console.log("Dashboard: Rendering main content", { userEmail: user?.email });
 
   return (
     <div className="min-h-screen w-full bg-[#050508] flex font-sans overflow-hidden">

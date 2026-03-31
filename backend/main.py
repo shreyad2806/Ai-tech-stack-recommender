@@ -16,11 +16,11 @@ try:
     redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
     redis_client.ping()  # Test connection
     REDIS_AVAILABLE = True
-    print("✅ Redis connected")
+    log.info("✅ Redis connected")
 except Exception as e:
     redis_client = None
     REDIS_AVAILABLE = False
-    print(f"⚠️ Redis not available: {e}")
+    log.warning("⚠️ Redis not available: %s", e)
 
 # In-memory cache for recommendations with TTL (fallback)
 cache = {}  # {idea: (data, timestamp)}
@@ -65,25 +65,31 @@ else:
 # ✅ FastAPI App
 app = FastAPI(title="StackMind Backend")
 
-# STEP 7: STARTUP LOG
-print("🚀 Backend running on port 8000")
-print(f"📡 CORS enabled for: http://localhost:5173")
-if model:
-    print(f"🤖 Gemini model: {GEMINI_MODEL}")
-else:
-    print("⚠️ Gemini not configured - will use fallback responses")
+# ✅ CORS - Updated for production
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://your-frontend-url.vercel.app",  # Replace with your deployed frontend URL
+]
 
-# ✅ INIT DB (VERY IMPORTANT)
-init_db()
-
-# ✅ CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# STEP 7: STARTUP LOG
+log.info("🚀 Backend running on port 8000")
+log.info("📡 CORS enabled for: %s", ALLOWED_ORIGINS)
+if model:
+    log.info("🤖 Gemini model: %s", GEMINI_MODEL)
+else:
+    log.warning("⚠️ Gemini not configured - will use fallback responses")
+
+# ✅ INIT DB (VERY IMPORTANT)
+init_db()
 
 # ✅ Global Error Handler
 @app.middleware("http")

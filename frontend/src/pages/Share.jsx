@@ -3,6 +3,9 @@ import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Server, Layers, Cloud, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import InputBox from "../components/InputBox";
 
+// 🌐 API Configuration
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
 // Read-only wrapper for InputBox
 export default function SharePage() {
   const { id } = useParams();
@@ -13,7 +16,7 @@ export default function SharePage() {
   useEffect(() => {
     const fetchSharedStack = async () => {
       try {
-        const res = await fetch(`http://127.0.0.1:8000/share/${id}`);
+        const res = await fetch(`${API_URL}/share/${id}`);
         
         if (!res.ok) {
           if (res.status === 404) {
@@ -25,7 +28,7 @@ export default function SharePage() {
         const data = await res.json();
         setResult(data.data);
       } catch (err) {
-        console.error("Error fetching shared stack:", err);
+        if (import.meta.env.DEV) console.error("Error fetching shared stack:", err);
         setError(err.message);
       } finally {
         setLoading(false);
