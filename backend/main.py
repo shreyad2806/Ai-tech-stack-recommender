@@ -243,16 +243,45 @@ async def recommend(req: IdeaRequest):
                 "roadmap": ["Error"]
             }
         
-        # STEP 1: Build simple prompt
-        prompt = f"""Generate a tech stack for: {idea}
+        # STEP 1: Build enhanced prompt with new optional fields
+        prompt = f"""Generate a comprehensive tech stack for: {idea}
 
-Return ONLY valid JSON:
+Return ONLY valid JSON with ALL fields:
 {{
   "architecture": "brief description",
   "core_technologies": ["tech1", "tech2", "tech3"],
   "deployment": "deployment method",
-  "roadmap": ["step 1", "step 2"]
-}}"""
+  "roadmap": ["step 1", "step 2"],
+  "architecture_diagram": {{
+    "nodes": [
+      {{"id": "frontend", "label": "Frontend", "type": "component"}},
+      {{"id": "backend", "label": "Backend", "type": "service"}},
+      {{"id": "database", "label": "Database", "type": "data"}}
+    ],
+    "edges": [
+      {{"from": "frontend", "to": "backend", "label": "API"}},
+      {{"from": "backend", "to": "database", "label": "queries"}}
+    ]
+  }},
+  "roadmap_phases": [
+    {{
+      "phase": "Phase 1: Foundation",
+      "items": ["Setup project", "Define architecture", "Choose tech stack"]
+    }},
+    {{
+      "phase": "Phase 2: Development",
+      "items": ["Build frontend", "Develop backend", "Setup database"]
+    }}
+  ],
+  "deployment_structured": {{
+    "platform": "AWS/Vercel/Heroku",
+    "strategy": "CI/CD pipeline",
+    "monitoring": "Logging and metrics",
+    "scaling": "Auto-scaling configuration"
+  }}
+}}
+
+IMPORTANT: Include all fields for complete solution."""
         
         print(f"📝 Prompt built: {prompt[:200]}...")
         
@@ -298,23 +327,29 @@ Return ONLY valid JSON:
             except Exception as e:
                 print(f"⚠️ JSON parse error: {e}")
             
-            # Return raw text as architecture if JSON fails
+            # Return raw text as architecture if JSON fails - include new fields
             return {
                 "architecture": text,
                 "core_technologies": [],
                 "deployment": "",
-                "roadmap": []
+                "roadmap": [],
+                "architecture_diagram": {"nodes": [], "edges": []},
+                "roadmap_phases": [],
+                "deployment_structured": {}
             }
         
         parsed = simple_extract(raw)
         print(f"✅ Parsed: {parsed}")
         
-        # Ensure basic structure
+        # Ensure basic structure with new optional fields
         result = {
             "architecture": parsed.get("architecture", raw[:500]),
             "core_technologies": parsed.get("core_technologies", []),
             "deployment": parsed.get("deployment", ""),
-            "roadmap": parsed.get("roadmap", [])
+            "roadmap": parsed.get("roadmap", []),
+            "architecture_diagram": parsed.get("architecture_diagram", {"nodes": [], "edges": []}),
+            "roadmap_phases": parsed.get("roadmap_phases", []),
+            "deployment_structured": parsed.get("deployment_structured", {})
         }
         
         print(f"✅ FINAL RESULT: {result}")

@@ -1,22 +1,23 @@
-import { useState } from "react";
 import { 
-  Rocket, 
-  BrainCircuit, 
-  Wallet, 
-  LineChart, 
-  Building2,
-  Loader2,
-  AlertCircle,
-  CheckCircle2,
-  Server,
-  Database,
-  Cloud,
-  Cpu,
   ArrowRight,
-  Layers,
+  Bot,
+  BrainCircuit,
+  Building2,
+  CheckCircle2,
   Code2,
+  Cpu,
+  Database,
   Globe,
-  Terminal
+  Layers,
+  LineChart,
+  Loader2,
+  Network,
+  Rocket,
+  Server,
+  Target,
+  Terminal,
+  Wallet,
+  Cloud
 } from "lucide-react";
 
 // 🛡️ SAFE DATA PARSING - Step 1: Fix data handling
@@ -53,7 +54,11 @@ const safeParseResult = (result) => {
       ? result.roadmap 
       : typeof result.roadmap === "object" && result.roadmap !== null
         ? Object.values(result.roadmap)
-        : []
+        : [],
+    // NEW OPTIONAL FIELDS - Backward compatible
+    architecture_diagram: result.architecture_diagram || { nodes: [], edges: [] },
+    roadmap_phases: Array.isArray(result.roadmap_phases) ? result.roadmap_phases : [],
+    deployment_structured: result.deployment_structured || {}
   };
 };
 
@@ -214,6 +219,117 @@ const RoadmapTimeline = ({ steps }) => {
           </div>
         );
       })}
+    </div>
+  );
+};
+
+// 🎯 ENHANCED DIAGRAM COMPONENT
+const EnhancedDiagram = ({ diagram }) => {
+  if (!diagram?.nodes || !Array.isArray(diagram.nodes) || diagram.nodes.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="bg-[#0f172a] rounded-lg p-4 border border-gray-800">
+      <h4 className="text-sm font-medium text-gray-400 mb-4">System Architecture</h4>
+      
+      {/* Nodes */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+        {diagram.nodes.map((node) => (
+          <div
+            key={node.id}
+            className={`
+              p-3 rounded-lg border text-center
+              ${node.type === 'component' ? 'bg-blue-500/10 border-blue-500/30 text-blue-300' : ''}
+              ${node.type === 'service' ? 'bg-green-500/10 border-green-500/30 text-green-300' : ''}
+              ${node.type === 'data' ? 'bg-orange-500/10 border-orange-500/30 text-orange-300' : ''}
+              ${!node.type ? 'bg-gray-500/10 border-gray-500/30 text-gray-300' : ''}
+            `}
+          >
+            <div className="font-medium text-sm">{node.label}</div>
+            <div className="text-xs opacity-75 mt-1">{node.type}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Connections */}
+      {diagram.edges && Array.isArray(diagram.edges) && diagram.edges.length > 0 && (
+        <div className="space-y-2">
+          <h5 className="text-xs font-medium text-gray-500 uppercase">Connections</h5>
+          {diagram.edges.map((edge, index) => (
+            <div key={index} className="flex items-center gap-2 text-xs">
+              <span className="text-blue-400">{edge.from}</span>
+              <ArrowRight className="w-3 h-3 text-gray-500" />
+              <span className="text-green-400">{edge.to}</span>
+              {edge.label && (
+                <span className="text-gray-500 ml-2">({edge.label})</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// 🗺️ STARTUP ROADMAP COMPONENT
+const StartupRoadmap = ({ phases }) => {
+  if (!Array.isArray(phases) || phases.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-4">
+      {phases.map((phase, index) => (
+        <div key={index} className="relative">
+          {/* Phase Header */}
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 flex items-center justify-center text-sm font-semibold text-purple-300">
+              {index + 1}
+            </div>
+            <h4 className="text-lg font-semibold text-white">{phase.phase}</h4>
+          </div>
+
+          {/* Phase Items */}
+          {phase.items && Array.isArray(phase.items) && (
+            <div className="ml-11 space-y-2">
+              {phase.items.map((item, itemIndex) => (
+                <div key={itemIndex} className="flex items-start gap-2">
+                  <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                  <span className="text-gray-300 text-sm">{item}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Connector Line */}
+          {index < phases.length - 1 && (
+            <div className="absolute left-4 top-12 w-px h-full bg-gradient-to-b from-purple-500/30 to-transparent" />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// ☁️ DEPLOYMENT PLAN COMPONENT
+const DeploymentPlan = ({ deployment }) => {
+  if (!deployment || typeof deployment !== 'object' || Object.keys(deployment).length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {Object.entries(deployment).map(([key, value]) => (
+        <div key={key} className="bg-[#0f172a] rounded-lg p-4 border border-gray-800">
+          <h5 className="text-sm font-medium text-cyan-400 capitalize mb-2">
+            {key.replace(/_/g, ' ')}
+          </h5>
+          <p className="text-gray-300 text-sm">
+            {typeof value === 'object' ? JSON.stringify(value) : value}
+          </p>
+        </div>
+      ))}
     </div>
   );
 };
@@ -455,7 +571,9 @@ export default function InputBox({ input, setInput, result, setResult }) {
             {safeResult.architecture ? (
               <div className="prose prose-invert max-w-none">
                 <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">
-                  {safeResult.architecture}
+                  {typeof safeResult.architecture === "object" 
+                    ? JSON.stringify(safeResult.architecture, null, 2)
+                    : safeResult.architecture}
                 </p>
               </div>
             ) : (
@@ -480,7 +598,16 @@ export default function InputBox({ input, setInput, result, setResult }) {
           {/* Deployment Card */}
           <Card title="Deployment Strategy" icon={Cloud}>
             {safeResult.deployment ? (
-              <p className="text-gray-300 leading-relaxed">{safeResult.deployment}</p>
+              <div className="text-gray-300 leading-relaxed">
+                {typeof safeResult.deployment === "object" 
+                  ? Object.entries(safeResult.deployment).map(([key, value]) => (
+                      <div key={key} className="mb-2">
+                        <span className="font-semibold text-cyan-400">{key}:</span>{" "}
+                        <span>{typeof value === "object" ? JSON.stringify(value) : value}</span>
+                      </div>
+                    ))
+                  : safeResult.deployment}
+              </div>
             ) : (
               <p className="text-gray-500 italic">No deployment strategy provided</p>
             )}
@@ -494,6 +621,29 @@ export default function InputBox({ input, setInput, result, setResult }) {
               <p className="text-gray-500 italic">No roadmap provided</p>
             )}
           </Card>
+
+          {/* NEW ENHANCED SECTIONS */}
+          
+          {/* Enhanced Architecture Diagram */}
+          {safeResult.architecture_diagram && (
+            <Card title="Enhanced Diagram" icon={Network}>
+              <EnhancedDiagram diagram={safeResult.architecture_diagram} />
+            </Card>
+          )}
+
+          {/* Startup Roadmap Phases */}
+          {safeResult.roadmap_phases && safeResult.roadmap_phases.length > 0 && (
+            <Card title="Startup Roadmap" icon={Target}>
+              <StartupRoadmap phases={safeResult.roadmap_phases} />
+            </Card>
+          )}
+
+          {/* Deployment Plan */}
+          {safeResult.deployment_structured && Object.keys(safeResult.deployment_structured).length > 0 && (
+            <Card title="Deployment Plan" icon={Cloud}>
+              <DeploymentPlan deployment={safeResult.deployment_structured} />
+            </Card>
+          )}
         </div>
       )}
     </div>
