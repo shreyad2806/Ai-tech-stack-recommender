@@ -52,11 +52,10 @@ An intelligent web application that transforms raw project ideas into complete, 
 
 ## 📸 Screenshots
 
-*Dashboard showing AI-generated tech stack recommendation*
+<img width="1887" height="913" alt="image" src="https://github.com/user-attachments/assets/e9d33cd8-c977-47de-9ed4-e99361d44614" />
+<img width="1899" height="923" alt="image" src="https://github.com/user-attachments/assets/7883705f-82ef-4a02-b366-6e45360aa13f" />
+<img width="1041" height="860" alt="image" src="https://github.com/user-attachments/assets/4da06a6a-9648-4199-b46c-84ebc0fd6a2a" />
 
-*Visual architecture diagram with system flow*
-
-*Categorized technology tags and deployment strategy*
 
 ## 🚀 Getting Started
 
