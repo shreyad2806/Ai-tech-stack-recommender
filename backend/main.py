@@ -65,6 +65,14 @@ else:
 # ✅ FastAPI App
 app = FastAPI(title="StackMind Backend")
 
+# STEP 7: STARTUP LOG
+print("🚀 Backend running on port 8000")
+print(f"📡 CORS enabled for: http://localhost:5173")
+if model:
+    print(f"🤖 Gemini model: {GEMINI_MODEL}")
+else:
+    print("⚠️ Gemini not configured - will use fallback responses")
+
 # ✅ INIT DB (VERY IMPORTANT)
 init_db()
 
@@ -93,17 +101,100 @@ class IdeaRequest(BaseModel):
     idea: str
 
 
+# 🛡️ FAULT-TOLERANT FALLBACK RESPONSE
+FALLBACK_RESPONSE = {
+    "architecture": "AI-generated architecture for your idea. The system includes a modern frontend (React/Vue), scalable backend (Node.js/Python), and cloud deployment infrastructure.",
+    "core_technologies": ["React", "Node.js", "FastAPI", "PostgreSQL", "Redis", "Docker", "AWS"],
+    "deployment": "Cloud deployment using Docker containers on AWS/GCP with CI/CD pipeline and auto-scaling.",
+    "roadmap": ["Define MVP scope and core features", "Build frontend and backend infrastructure", "Deploy MVP and gather user feedback", "Scale and optimize for production"]
+}
+
 # ------------------ HELPERS ------------------
 
-def extract_json_from_text(text: str):
+import re
+
+def extract_json(text):
+    """Extract and parse JSON from text, return partial data if parsing fails."""
+    import json
+    
+    if not text or not isinstance(text, str):
+        print("⚠️ Empty text in extract_json")
+        return {
+            "architecture": "",
+            "core_technologies": [],
+            "deployment": "",
+            "roadmap": []
+        }
+    
+    print(f"📝 EXTRACT_JSON INPUT: {text[:200]}...")
+    
+    # Remove markdown code blocks
+    clean_text = re.sub(r'```json\s*', '', text, flags=re.IGNORECASE)
+    clean_text = re.sub(r'```\s*', '', clean_text)
+    clean_text = clean_text.strip()
+    
+    print(f"🧹 CLEANED TEXT: {clean_text[:200]}...")
+    
+    # Try to find JSON object using regex
     try:
-        start = text.find("{")
-        end = text.rfind("}") + 1
-        if start != -1 and end > start:
-            return json.loads(text[start:end])
-    except Exception:
-        return None
-    return None
+        match = re.search(r'\{.*\}', clean_text, re.DOTALL)
+        if match:
+            json_str = match.group(0)  # Use group(0) not group()
+            print(f"🔍 FOUND JSON BLOCK: {json_str[:200]}...")
+            parsed = json.loads(json_str)
+            print(f"✅ JSON PARSED SUCCESSFULLY: {parsed}")
+            return parsed
+    except Exception as e:
+        print(f"❌ JSON parse error: {e}")
+    
+    # Fallback: try direct json.loads
+    try:
+        print("🔄 Trying direct json.loads...")
+        parsed = json.loads(clean_text)
+        print(f"✅ DIRECT PARSE SUCCESS: {parsed}")
+        return parsed
+    except Exception as e:
+        print(f"❌ Direct parse failed: {e}")
+    
+    # STEP 4: Return partial structured object with raw text as architecture
+    print("⚠️ Using RAW TEXT FALLBACK - preserving AI output")
+    return {
+        "architecture": text[:500],  # STEP 4: preserve AI output
+        "core_technologies": [],
+        "deployment": "",
+        "roadmap": []
+    }
+
+
+def normalize_response(data, raw_text=""):
+    """Normalize response - preserve AI data, only fill missing fields."""
+    print(f"🔄 NORMALIZE INPUT: {data}")
+    
+    # STEP 6: Ensure data is at least an empty dict
+    if not data or not isinstance(data, dict):
+        print("⚠️ normalize_response: data is not dict, using empty")
+        data = {}
+    
+    # STEP 6: Preserve AI data, only fill missing
+    result = {
+        "architecture": data.get("architecture", ""),
+        "core_technologies": data.get("core_technologies", []),
+        "deployment": data.get("deployment", ""),
+        "roadmap": data.get("roadmap", [])
+    }
+    
+    # Convert any dict values to appropriate types
+    if isinstance(result["architecture"], dict):
+        result["architecture"] = json.dumps(result["architecture"], indent=2)
+    if isinstance(result["deployment"], dict):
+        result["deployment"] = json.dumps(result["deployment"], indent=2)
+    if isinstance(result["core_technologies"], dict):
+        result["core_technologies"] = list(result["core_technologies"].values())
+    if isinstance(result["roadmap"], dict):
+        result["roadmap"] = list(result["roadmap"].values())
+    
+    print(f"✅ NORMALIZE OUTPUT: {result}")
+    return result
 
 
 def get_response_text(resp):
@@ -123,105 +214,124 @@ def root():
     return {"status": "Backend running 🚀"}
 
 
-# 🚀 RECOMMEND (LLM)
+# 🚀 RECOMMEND (LLM) - DIAGNOSTIC VERSION - STEP 1 & 2: FORCE RAW OUTPUT
 @app.post("/recommend")
 async def recommend(req: IdeaRequest):
-    idea = (req.idea or "").strip().lower()
-    log.info(f"📥 Idea: {idea}")
-
-    # Check Redis cache first (if available)
-    if REDIS_AVAILABLE and redis_client:
-        try:
-            cached = redis_client.get(idea)
-            if cached:
-                print("⚡ Redis Cache HIT")
-                return json.loads(cached)
-        except Exception as e:
-            print(f"⚠️ Redis error: {e}")
-
-    # Check in-memory cache with TTL (fallback)
-    current_time = time.time()
-    if idea in cache:
-        cached_data, timestamp = cache[idea]
-        if current_time - timestamp < CACHE_TTL:
-            print("⚡ Memory Cache HIT")
-            return cached_data
-        else:
-            print("⏳ Memory Cache expired")
-            del cache[idea]
+    print("\n" + "="*60)
+    print("🔥 API HIT - /recommend endpoint called")
     
-    print("🧠 Cache MISS → calling Gemini")
-
-    if not model:
-        raise HTTPException(503, "Gemini not configured")
-
-    prompt = f"""
-Generate a COMPLETE and UNIQUE tech stack for:
-
-{idea}
-
-Return ONLY JSON:
-{{
-  "architecture": "...",
-  "core_technologies": ["..."],
-  "deployment": "...",
-  "roadmap": ["..."]
-}}
-"""
-
     try:
+        idea = (req.idea or "").strip()
+        print(f"👉 Input idea: '{idea}'")
+        
+        if not idea:
+            print("⚠️ Empty idea - returning test response")
+            return {
+                "architecture": "Empty idea provided - test response",
+                "core_technologies": ["Test"],
+                "deployment": "Test deployment",
+                "roadmap": ["Step 1"]
+            }
+        
+        # Check if model is available
+        if not model:
+            print("❌ Gemini model not available")
+            return {
+                "architecture": "Gemini not configured",
+                "core_technologies": ["Error"],
+                "deployment": "Error",
+                "roadmap": ["Error"]
+            }
+        
+        # STEP 1: Build simple prompt
+        prompt = f"""Generate a tech stack for: {idea}
+
+Return ONLY valid JSON:
+{{
+  "architecture": "brief description",
+  "core_technologies": ["tech1", "tech2", "tech3"],
+  "deployment": "deployment method",
+  "roadmap": ["step 1", "step 2"]
+}}"""
+        
+        print(f"📝 Prompt built: {prompt[:200]}...")
+        
+        # STEP 1: Call Gemini
+        print("🤖 Calling Gemini...")
         resp = model.generate_content(prompt)
-        raw = get_response_text(resp).strip()
-    except Exception as e:
-        raise HTTPException(502, f"Model failed: {e}")
-
-    if not raw:
-        raise HTTPException(502, "Empty model response")
-
-    if "```" in raw:
-        raw = raw.split("```")[1].replace("json", "").strip()
-
-    parsed = extract_json_from_text(raw)
-
-    if not parsed:
+        print(f"✅ Got response object: {type(resp)}")
+        
+        # STEP 1: Extract text safely
+        def get_text(resp):
+            try:
+                return resp.text
+            except:
+                try:
+                    return resp.candidates[0].content.parts[0].text
+                except:
+                    return ""
+        
+        raw = get_text(resp)
+        print(f"🔥 RAW GEMINI OUTPUT:\n{raw}\n")
+        print(f"📊 Length: {len(raw)} characters")
+        
+        # STEP 2: TEMPORARY BYPASS - Return raw directly structured
+        # STEP 3: NO FALLBACK - Just return what we got
+        if not raw:
+            print("❌ Empty response from Gemini")
+            return {
+                "architecture": "Gemini returned empty response",
+                "core_technologies": ["Error"],
+                "deployment": "Error",
+                "roadmap": ["Error"]
+            }
+        
+        # STEP 6: Simple safe parsing
+        print("🔧 Attempting to parse JSON...")
+        import json, re
+        
+        def simple_extract(text):
+            try:
+                match = re.search(r'\{.*\}', text, re.DOTALL)
+                if match:
+                    return json.loads(match.group(0))
+            except Exception as e:
+                print(f"⚠️ JSON parse error: {e}")
+            
+            # Return raw text as architecture if JSON fails
+            return {
+                "architecture": text,
+                "core_technologies": [],
+                "deployment": "",
+                "roadmap": []
+            }
+        
+        parsed = simple_extract(raw)
+        print(f"✅ Parsed: {parsed}")
+        
+        # Ensure basic structure
         result = {
-            "architecture": raw[:500],
-            "core_technologies": ["AI-generated"],
-            "deployment": "Generated",
-            "roadmap": ["See architecture"],
+            "architecture": parsed.get("architecture", raw[:500]),
+            "core_technologies": parsed.get("core_technologies", []),
+            "deployment": parsed.get("deployment", ""),
+            "roadmap": parsed.get("roadmap", [])
         }
         
-        # Store in Redis (if available)
-        if REDIS_AVAILABLE and redis_client:
-            try:
-                redis_client.setex(idea, CACHE_TTL, json.dumps(result))
-                print("💾 Saved to Redis")
-            except Exception as e:
-                print(f"⚠️ Redis save error: {e}")
+        print(f"✅ FINAL RESULT: {result}")
+        print("="*60 + "\n")
         
-        # Store in memory cache with timestamp
-        cache[idea] = (result, current_time)
         return result
-
-    result = {
-        "architecture": parsed.get("architecture", ""),
-        "core_technologies": parsed.get("core_technologies", []),
-        "deployment": parsed.get("deployment", ""),
-        "roadmap": parsed.get("roadmap", []),
-    }
-    
-    # Store in Redis (if available)
-    if REDIS_AVAILABLE and redis_client:
-        try:
-            redis_client.setex(idea, CACHE_TTL, json.dumps(result))
-            print("💾 Saved to Redis")
-        except Exception as e:
-            print(f"⚠️ Redis save error: {e}")
-    
-    # Store in memory cache with timestamp
-    cache[idea] = (result, current_time)
-    
-    return result
+        
+    except Exception as e:
+        print(f"🔥 CRITICAL ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            "architecture": f"Error: {str(e)}",
+            "core_technologies": ["Error"],
+            "deployment": "Error",
+            "roadmap": ["Error"]
+        }
 
 @app.post("/recommend-stream")
 async def recommend_stream(data: IdeaRequest):
