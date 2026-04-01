@@ -3,14 +3,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from dotenv import load_dotenv
 
-# ✅ Load environment variables
-load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-# ✅ Database URL
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://postgres:postgres@localhost:5432/aitech"
-)
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL not set")
+
+# Fix Render postgres URL
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 # ✅ Create engine
 engine = create_engine(DATABASE_URL)
