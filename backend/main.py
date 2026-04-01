@@ -11,6 +11,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
+# ✅ Load ENV first
+load_dotenv()
+
+# ✅ Logging setup (MUST be before any log usage)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+log = logging.getLogger("backend")
+
 # Redis client for distributed caching
 try:
     redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
@@ -29,13 +36,6 @@ from sqlalchemy.orm import Session
 
 from database import get_db, init_db
 from models import Stack
-
-# ✅ Load ENV
-load_dotenv()
-
-# ✅ Logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-log = logging.getLogger("backend")
 
 # ✅ Gemini Import
 try:
@@ -88,8 +88,12 @@ if model:
 else:
     log.warning("⚠️ Gemini not configured - will use fallback responses")
 
-# ✅ INIT DB (VERY IMPORTANT)
-init_db()
+# ✅ INIT DB (VERY IMPORTANT) - wrapped in try-except for safety
+try:
+    init_db()
+    log.info("✅ Database initialized successfully")
+except Exception as e:
+    log.warning("⚠️ Database initialization failed (will retry on first request): %s", e)
 
 # ✅ Global Error Handler
 @app.middleware("http")
@@ -218,6 +222,17 @@ def get_response_text(resp):
 @app.get("/")
 def root():
     return {"status": "Backend running 🚀"}
+
+
+@app.get("/health")
+def health_check():
+    """Health check endpoint for Render."""
+    return {
+        "status": "healthy",
+        "timestamp": time.time(),
+        "redis": REDIS_AVAILABLE,
+        "gemini": model is not None
+    }
 
 
 # 🚀 RECOMMEND (LLM) - DIAGNOSTIC VERSION - STEP 1 & 2: FORCE RAW OUTPUT
