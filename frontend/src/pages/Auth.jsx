@@ -2,6 +2,10 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Mail, Lock, EyeOff, Eye } from "lucide-react";
 
+// 🌐 API Configuration
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+console.log("API URL:", API_URL);
+
 export default function Auth() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -14,13 +18,13 @@ export default function Auth() {
 
   const handleSignup = async () => {
     try {
-      await fetch("http://127.0.0.1:8000/signup", {
+      await fetch(`${API_URL}/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
-      const res = await fetch("http://127.0.0.1:8000/login", {
+      const res = await fetch(`${API_URL}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -50,7 +54,7 @@ export default function Auth() {
 
   const handleLogin = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:8000/login", {
+      const res = await fetch(`${API_URL}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
