@@ -3,7 +3,7 @@ import json
 import logging
 import asyncio
 import time
-import redis
+# import redis  # Temporarily disabled
 from typing import Any
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, HTTPException, Depends
@@ -14,20 +14,24 @@ from pydantic import BaseModel
 # ✅ Load ENV first
 load_dotenv()
 
-# ✅ Logging setup (MUST be before any log usage)
+# Logging setup (MUST be before any log usage)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("backend")
 
-# Redis client for distributed caching
-try:
-    redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
-    redis_client.ping()  # Test connection
-    REDIS_AVAILABLE = True
-    log.info("✅ Redis connected")
-except Exception as e:
-    redis_client = None
-    REDIS_AVAILABLE = False
-    log.warning("⚠️ Redis not available: %s", e)
+# Redis client for distributed caching - TEMPORARILY DISABLED
+# try:
+#     redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
+#     redis_client.ping()  # Test connection
+#     REDIS_AVAILABLE = True
+#     log.info("✅ Redis connected")
+# except Exception as e:
+#     redis_client = None
+#     REDIS_AVAILABLE = False
+#     log.warning("⚠️ Redis not available: %s", e)
+
+# Mock Redis variables for compatibility
+redis_client = None
+REDIS_AVAILABLE = False
 
 # In-memory cache for recommendations with TTL (fallback)
 cache = {}  # {idea: (data, timestamp)}
