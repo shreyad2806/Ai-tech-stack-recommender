@@ -41,3 +41,7 @@ def get_db():
 def init_db():
     from models import User, Stack, StackShare  # 👈 ensures models are registered
     Base.metadata.create_all(bind=engine)
+
+@app.on_event("startup")
+def startup():
+    init_db()
