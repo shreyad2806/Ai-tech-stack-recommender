@@ -69,6 +69,19 @@ else:
 # ✅ FastAPI App
 app = FastAPI(title="StackMind Backend")
 
+# ✅ Startup event - init database AFTER app is created
+@app.on_event("startup")
+def startup():
+    try:
+        success = init_db()
+        if success:
+            log.info("✅ Database initialized on startup")
+        else:
+            log.warning("⚠️ Database initialization skipped (no DATABASE_URL)")
+    except Exception as e:
+        log.error(f"❌ Database initialization failed on startup: {e}")
+        # Don't crash the app - let it start without DB
+
 # ✅ CORS - Updated for production
 ALLOWED_ORIGINS = [
     "http://localhost:5173",
@@ -92,13 +105,6 @@ if model:
     log.info("🤖 Gemini model: %s", GEMINI_MODEL)
 else:
     log.warning("⚠️ Gemini not configured - will use fallback responses")
-
-# ✅ INIT DB (VERY IMPORTANT) - wrapped in try-except for safety
-try:
-    init_db()
-    log.info("✅ Database initialized successfully")
-except Exception as e:
-    log.warning("⚠️ Database initialization failed (will retry on first request): %s", e)
 
 # ✅ Global Error Handler
 @app.middleware("http")
