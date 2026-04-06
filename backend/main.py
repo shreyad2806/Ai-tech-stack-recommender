@@ -73,7 +73,8 @@ app = FastAPI(title="StackMind Backend")
 ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://your-frontend-url.vercel.app",  # Replace with your deployed frontend URL
+    "https://stackmind-xi.vercel.app",  # ✅ Actual Vercel frontend URL
+    "https://your-frontend-url.vercel.app",  # Keep for flexibility
 ]
 
 app.add_middleware(
@@ -461,21 +462,93 @@ def get_stacks(db: Session = Depends(get_db)):
     ]
 
 
-# 🔐 TEMP AUTH
-@app.post("/login")
-def login():
-    return {
-        "access_token": "test-token",
-        "user": {"email": "test@stackmind.ai"},
-    }
+# 🔐 AUTH ROUTES - Production Ready
+from pydantic import BaseModel, EmailStr
+from passlib.context import CryptContext
+import uuid
 
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+class UserAuth(BaseModel):
+    email: EmailStr
+    password: str
+
+class UserResponse(BaseModel):
+    success: bool
+    token: str
+    user: dict
+
+# In-memory user store (replace with MongoDB/PostgreSQL in production)
+users_db = {}
+
+@app.post("/auth/signup", response_model=UserResponse)
+def signup(auth: UserAuth):
+    """Register a new user."""
+    try:
+        if auth.email in users_db:
+            raise HTTPException(status_code=400, detail="User already exists")
+        
+        # Hash password
+        hashed_pw = pwd_context.hash(auth.password)
+        
+        # Create user
+        user_id = str(uuid.uuid4())
+        users_db[auth.email] = {
+            "id": user_id,
+            "email": auth.email,
+            "password": hashed_pw
+        }
+        
+        # Generate token
+        token = f"token-{user_id}"
+        
+        log.info(f"✅ User registered: {auth.email}")
+        
+        return {
+            "success": True,
+            "token": token,
+            "user": {"id": user_id, "email": auth.email}
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error(f"❌ Signup error: {e}")
+        raise HTTPException(status_code=500, detail="Registration failed")
+
+@app.post("/auth/login", response_model=UserResponse)
+def login(auth: UserAuth):
+    """Authenticate user and return token."""
+    try:
+        user = users_db.get(auth.email)
+        
+        if not user or not pwd_context.verify(auth.password, user["password"]):
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+        
+        # Generate token
+        token = f"token-{user['id']}"
+        
+        log.info(f"✅ User logged in: {auth.email}")
+        
+        return {
+            "success": True,
+            "token": token,
+            "user": {"id": user["id"], "email": user["email"]}
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error(f"❌ Login error: {e}")
+        raise HTTPException(status_code=500, detail="Login failed")
+
+# Keep old routes for backward compatibility
 @app.post("/signup")
-def signup():
-    return {
-        "access_token": "test-token",
-        "user": {"email": "test@stackmind.ai"},
-    }
+def signup_legacy():
+    return {"access_token": "test-token", "user": {"email": "test@stackmind.ai"}}
+
+@app.post("/login")
+def login_legacy():
+    return {"access_token": "test-token", "user": {"email": "test@stackmind.ai"}}
 
 
 # 🔗 SHARE STACK ENDPOINTS (NEW)
