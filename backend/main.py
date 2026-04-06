@@ -462,10 +462,12 @@ def get_stacks(db: Session = Depends(get_db)):
     ]
 
 
-# 🔐 AUTH ROUTES - Production Ready
+# 🔐 AUTH ROUTES - Database Based
 from pydantic import BaseModel, EmailStr
 from passlib.context import CryptContext
-import uuid
+from sqlalchemy.orm import Session
+from database import get_db
+from models import User
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -479,36 +481,37 @@ class UserResponse(BaseModel):
     token: str
     user: dict
 
-# In-memory user store (replace with MongoDB/PostgreSQL in production)
-users_db = {}
-
 @app.post("/auth/signup", response_model=UserResponse)
-def signup(auth: UserAuth):
-    """Register a new user."""
+def signup(auth: UserAuth, db: Session = Depends(get_db)):
+    """Register a new user in database."""
     try:
-        if auth.email in users_db:
+        # Check if user exists
+        existing_user = db.query(User).filter(User.email == auth.email).first()
+        if existing_user:
             raise HTTPException(status_code=400, detail="User already exists")
         
         # Hash password
         hashed_pw = pwd_context.hash(auth.password)
         
         # Create user
-        user_id = str(uuid.uuid4())
-        users_db[auth.email] = {
-            "id": user_id,
-            "email": auth.email,
-            "password": hashed_pw
-        }
+        new_user = User(
+            email=auth.email,
+            password=hashed_pw
+        )
+        
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
         
         # Generate token
-        token = f"token-{user_id}"
+        token = f"token-{new_user.id}"
         
         log.info(f"✅ User registered: {auth.email}")
         
         return {
             "success": True,
             "token": token,
-            "user": {"id": user_id, "email": auth.email}
+            "user": {"id": new_user.id, "email": new_user.email}
         }
     except HTTPException:
         raise
@@ -517,23 +520,24 @@ def signup(auth: UserAuth):
         raise HTTPException(status_code=500, detail="Registration failed")
 
 @app.post("/auth/login", response_model=UserResponse)
-def login(auth: UserAuth):
-    """Authenticate user and return token."""
+def login(auth: UserAuth, db: Session = Depends(get_db)):
+    """Authenticate user from database."""
     try:
-        user = users_db.get(auth.email)
+        # Find user
+        user = db.query(User).filter(User.email == auth.email).first()
         
-        if not user or not pwd_context.verify(auth.password, user["password"]):
+        if not user or not pwd_context.verify(auth.password, user.password):
             raise HTTPException(status_code=401, detail="Invalid email or password")
         
         # Generate token
-        token = f"token-{user['id']}"
+        token = f"token-{user.id}"
         
         log.info(f"✅ User logged in: {auth.email}")
         
         return {
             "success": True,
             "token": token,
-            "user": {"id": user["id"], "email": user["email"]}
+            "user": {"id": user.id, "email": user.email}
         }
     except HTTPException:
         raise
@@ -541,14 +545,6 @@ def login(auth: UserAuth):
         log.error(f"❌ Login error: {e}")
         raise HTTPException(status_code=500, detail="Login failed")
 
-# Keep old routes for backward compatibility
-@app.post("/signup")
-def signup_legacy():
-    return {"access_token": "test-token", "user": {"email": "test@stackmind.ai"}}
-
-@app.post("/login")
-def login_legacy():
-    return {"access_token": "test-token", "user": {"email": "test@stackmind.ai"}}
 
 
 # 🔗 SHARE STACK ENDPOINTS (NEW)

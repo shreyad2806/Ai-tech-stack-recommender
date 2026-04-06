@@ -18,43 +18,39 @@ export default function Auth() {
 
   const handleSignup = async () => {
     try {
-      await fetch(`${API_URL}/signup`, {
+      const signupRes = await fetch(`${API_URL}/auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
-      const res = await fetch(`${API_URL}/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      let data;
+      let signupData;
       try {
-        data = await res.json();
+        signupData = await signupRes.json();
       } catch (e) {
-        console.error("Invalid JSON response during signup login", e);
-        data = { error: "Invalid response from server" };
+        if (import.meta.env.DEV) console.error("Invalid JSON response during signup", e);
+        throw new Error("Invalid response from server");
       }
 
-      if (!res.ok || data.error) {
-        throw new Error(data.error || "Login failed after signup");
+      if (!signupRes.ok || !signupData.success) {
+        throw new Error(signupData.detail || "Signup failed");
       }
 
-      localStorage.setItem("token", data.access_token);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      // Store token and user from signup response
+      localStorage.setItem("token", signupData.token);
+      localStorage.setItem("user", JSON.stringify(signupData.user));
 
       navigate("/dashboard");
 
     } catch (err) {
-      console.error(err);
+      if (import.meta.env.DEV) console.error("Signup error:", err);
+      alert(err.message || "Signup failed");
     }
   };
 
   const handleLogin = async () => {
     try {
-      const res = await fetch(`${API_URL}/login`, {
+      const res = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -64,21 +60,22 @@ export default function Auth() {
       try {
         data = await res.json();
       } catch (e) {
-        console.error("Invalid JSON response during login", e);
-        data = { error: "Invalid response from server" };
+        if (import.meta.env.DEV) console.error("Invalid JSON response during login", e);
+        throw new Error("Invalid response from server");
       }
 
-      if (!res.ok || data.error) {
-        throw new Error(data.error || "Login failed");
+      if (!res.ok || !data.success) {
+        throw new Error(data.detail || "Login failed");
       }
 
-      localStorage.setItem("token", data.access_token);
+      localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
 
       navigate("/dashboard");
 
     } catch (err) {
-      console.error(err);
+      if (import.meta.env.DEV) console.error("Login error:", err);
+      alert(err.message || "Login failed");
     }
   };
 
