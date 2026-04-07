@@ -484,6 +484,7 @@ class UserAuth(BaseModel):
     
     @validator('password')
     def validate_password(cls, v):
+        v = v.strip()
         if len(v) > 72:
             raise ValueError('Password cannot exceed 72 characters')
         if len(v) < 6:
@@ -509,12 +510,21 @@ def signup(auth: UserAuth, db: Session = Depends(get_db)):
             print(f"⚠️ User already exists: {auth.email}")
             raise HTTPException(status_code=400, detail="User already exists")
         
-        # Hash password
-        print("🔐 Hashing password...")
-        print("Password length:", len(auth.password))
-        print("Password value:", auth.password)
-        print("Password type:", type(auth.password))
-        hashed_pw = pwd_context.hash(auth.password)
+        # CLEAN PASSWORD
+        clean_password = auth.password.strip()
+        
+        print("Original password:", auth.password)
+        print("Cleaned password:", clean_password)
+        print("Length:", len(clean_password))
+        print("Type:", type(clean_password))
+        
+        if not isinstance(clean_password, str):
+            raise HTTPException(status_code=400, detail="Password must be string")
+        
+        if len(clean_password) > 72:
+            raise HTTPException(status_code=400, detail="Password too long")
+        
+        hashed_pw = pwd_context.hash(clean_password)
         
         # Create user
         print("📝 Creating new user...")
