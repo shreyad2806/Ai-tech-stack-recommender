@@ -490,40 +490,53 @@ class UserResponse(BaseModel):
 @app.post("/auth/signup", response_model=UserResponse)
 def signup(auth: UserAuth, db: Session = Depends(get_db)):
     """Register a new user in database."""
+    print(f"📥 Incoming signup request: {auth.email}")
+    
     try:
         # Check if user exists
+        print("🔍 Checking if user exists...")
         existing_user = db.query(User).filter(User.email == auth.email).first()
+        
         if existing_user:
+            print(f"⚠️ User already exists: {auth.email}")
             raise HTTPException(status_code=400, detail="User already exists")
         
         # Hash password
+        print("🔐 Hashing password...")
         hashed_pw = pwd_context.hash(auth.password)
         
         # Create user
+        print("📝 Creating new user...")
         new_user = User(
             email=auth.email,
             password=hashed_pw
         )
         
+        print("💾 Adding user to database...")
         db.add(new_user)
+        
+        print("📤 Committing transaction...")
         db.commit()
         db.refresh(new_user)
         
         # Generate token
         token = f"token-{new_user.id}"
         
-        log.info(f"✅ User registered: {auth.email}")
+        print(f"✅ User registered successfully: {auth.email}")
         
         return {
             "success": True,
             "token": token,
             "user": {"id": new_user.id, "email": new_user.email}
         }
+        
     except HTTPException:
         raise
     except Exception as e:
-        log.error(f"❌ Signup error: {e}")
-        raise HTTPException(status_code=500, detail="Registration failed")
+        print(f"❌ Signup error: {str(e)}")
+        import traceback
+        print(f"🔴 Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
 @app.post("/auth/login", response_model=UserResponse)
 def login(auth: UserAuth, db: Session = Depends(get_db)):
