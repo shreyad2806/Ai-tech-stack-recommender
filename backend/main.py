@@ -469,7 +469,7 @@ def get_stacks(db: Session = Depends(get_db)):
 
 
 # 🔐 AUTH ROUTES - Database Based
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, validator
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 from database import get_db
@@ -481,6 +481,14 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 class UserAuth(BaseModel):
     email: EmailStr
     password: str
+    
+    @validator('password')
+    def validate_password(cls, v):
+        if len(v) > 72:
+            raise ValueError('Password cannot exceed 72 characters')
+        if len(v) < 6:
+            raise ValueError('Password must be at least 6 characters')
+        return v
 
 class UserResponse(BaseModel):
     success: bool
