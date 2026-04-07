@@ -3,8 +3,9 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Mail, Lock, EyeOff, Eye } from "lucide-react";
 
 // 🌐 API Configuration
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, ''); // Remove trailing slash
 console.log("API URL:", API_URL);
+console.log("Final signup URL:", `${API_URL}/auth/signup`);
 
 export default function Auth() {
   const location = useLocation();
@@ -23,6 +24,7 @@ export default function Auth() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
+      console.log("Signup response status:", signupRes.status);
 
       let signupData;
       try {
@@ -55,6 +57,7 @@ export default function Auth() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
+      console.log("Login response status:", res.status);
 
       let data;
       try {
