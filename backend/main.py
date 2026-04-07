@@ -511,6 +511,9 @@ def signup(auth: UserAuth, db: Session = Depends(get_db)):
         
         # Hash password
         print("🔐 Hashing password...")
+        print("Password length:", len(auth.password))
+        print("Password value:", auth.password)
+        print("Password type:", type(auth.password))
         hashed_pw = pwd_context.hash(auth.password)
         
         # Create user
