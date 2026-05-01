@@ -604,6 +604,16 @@ def signup(auth: UserAuth, db: Session = Depends(get_db)):
         print(f"🔴 Full traceback:\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
+        clean_password = auth.password.strip()
+
+print("RAW PASSWORD:", repr(auth.password))
+print("CLEAN PASSWORD:", repr(clean_password))
+print("LENGTH:", len(clean_password))
+
+# ✅ HARD FIX
+clean_password = clean_password[:72]
+
+       
 @app.post("/auth/login", response_model=UserResponse)
 def login(auth: UserAuth, db: Session = Depends(get_db)):
     """Authenticate user from database."""
