@@ -531,91 +531,91 @@ class UserResponse(BaseModel):
     token: str
     user: dict
 
-@app.post("/auth/signup", response_model=UserResponse)
+import traceback
+
+@app.post("/auth/signup")
 def signup(auth: UserAuth, db: Session = Depends(get_db)):
-    print(f"📥 Signup: {auth.email}")
-
     try:
-        # Check existing user
-        existing_user = db.query(User).filter(User.email == auth.email).first()
-        if existing_user:
-            raise HTTPException(status_code=400, detail="User already exists")
+        # Clean inputs
+        email = auth.email.strip().lower()
+        password = auth.password.strip()
 
-        # ✅ CLEAN PASSWORD ONCE (ONLY ONCE)
-        clean_password = auth.password.strip()
-
-        if not clean_password:
+        # Validate
+        if not password:
             raise HTTPException(status_code=400, detail="Password cannot be empty")
 
-        if len(clean_password) < 6:
+        if len(password) < 6:
             raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
 
-        # ✅ CRITICAL FIX: truncate BEFORE hashing
-        if len(clean_password) > 72:
-            print("⚠️ Truncating password to 72 chars")
-            clean_password = clean_password[:72]
+        # 🔥 CRITICAL FIX — ALWAYS LIMIT BEFORE HASHING
+        password = password[:72]
 
-        print("DEBUG LENGTH:", len(clean_password))
+        # Hash password
+        hashed_pw = pwd_context.hash(password)
 
-        # ✅ HASH AFTER truncation
-        hashed_pw = pwd_context.hash(clean_password)
+        # Check if user exists
+        existing = db.query(User).filter(User.email == email).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="User already exists")
 
         # Create user
-        new_user = User(
-            email=auth.email,
-            password=hashed_pw
-        )
-
+        new_user = User(email=email, password=hashed_pw)
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
 
-        return {
-            "success": True,
-            "token": f"token-{new_user.id}",
-            "user": {"id": new_user.id, "email": new_user.email}
-        }
-
-    except Exception as e:
-        print("❌ Signup error:", str(e))
-        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
-
-
-       
-@app.post("/auth/login", response_model=UserResponse)
-def login(auth: UserAuth, db: Session = Depends(get_db)):
-    print(f"📥 Incoming login request: {auth.email}")
-
-    if db is None:
-        raise HTTPException(status_code=503, detail="Database unavailable")
-
-    try:
-        user = db.query(User).filter(User.email == auth.email).first()
-
-        clean_password = auth.password.strip()
-
-        # bcrypt safety
-        if len(clean_password) > 72:
-            clean_password = clean_password[:72]
-
-        if not user:
-            raise HTTPException(status_code=401, detail="Invalid email or password")
-
-        if not pwd_context.verify(clean_password, user.password):
-            raise HTTPException(status_code=401, detail="Invalid email or password")
-
-        token = f"token-{user.id}"
+        # Generate token
+        token = create_token({"sub": new_user.email})
 
         return {
             "success": True,
             "token": token,
-            "user": {"id": user.id, "email": user.email}
+            "user": {
+                "id": new_user.id,
+                "email": new_user.email
+            }
         }
 
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Login error: {e}")
+        print("Signup error:", str(e))
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail="Registration failed")
+
+       
+@app.post("/auth/login")
+def login(auth: UserAuth, db: Session = Depends(get_db)):
+    try:
+        email = auth.email.strip().lower()
+        password = auth.password.strip()
+
+        user = db.query(User).filter(User.email == email).first()
+
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+
+        # 🔥 Match SAME truncation logic
+        password = password[:72]
+
+        if not pwd_context.verify(password, user.password):
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+
+        token = create_token({"sub": user.email})
+
+        return {
+            "success": True,
+            "token": token,
+            "user": {
+                "id": user.id,
+                "email": user.email
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print("Login error:", str(e))
         raise HTTPException(status_code=500, detail="Login failed")
 
 
