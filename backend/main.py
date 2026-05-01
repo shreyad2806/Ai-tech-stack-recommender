@@ -536,23 +536,18 @@ def signup(auth: UserAuth, db: Session = Depends(get_db)):
     """Register a new user in database."""
     print(f"📥 Incoming signup request: {auth.email}")
 
-    # ✅ DB SAFETY CHECK
+    # ✅ DB SAFETY
     if db is None:
-        print("❌ CRITICAL: Database not available")
+        print("❌ Database not available")
         raise HTTPException(status_code=503, detail="Database unavailable")
 
     try:
-        print("DB SESSION TYPE:", type(db))
-
-        # Check if user exists
-        print("🔍 Checking if user exists...")
+        # 🔍 Check if user exists
         existing_user = db.query(User).filter(User.email == auth.email).first()
-
         if existing_user:
-            print(f"⚠️ User already exists: {auth.email}")
             raise HTTPException(status_code=400, detail="User already exists")
 
-        # Clean password
+        # 🔐 Clean password
         clean_password = auth.password.strip()
 
         if not clean_password:
@@ -561,34 +556,35 @@ def signup(auth: UserAuth, db: Session = Depends(get_db)):
         if not isinstance(clean_password, str):
             raise HTTPException(status_code=400, detail="Password must be string")
 
-        # ✅ FIX: Truncate password to 71 chars to prevent bcrypt crash
-        if len(clean_password) > 71:
-            print(f"⚠️ Password too long ({len(clean_password)}), truncating to 71 chars")
-            clean_password = clean_password[:71]
+        # 🔍 DEBUG (IMPORTANT)
+        print("RAW PASSWORD:", repr(auth.password))
+        print("CLEAN PASSWORD:", repr(clean_password))
+        print("LENGTH:", len(clean_password))
 
-        print("🔐 Hashing password...")
+        # ✅ BCRYPT SAFETY FIX
+        if len(clean_password) > 72:
+            print("⚠️ Truncating password to 72 chars")
+            clean_password = clean_password[:72]
+
+        print("🔥 Hashing password...")
 
         hashed_pw = pwd_context.hash(clean_password)
 
-        # Create user
+        # 🧑‍💻 Create user
         print("📝 Creating new user...")
         new_user = User(
             email=auth.email,
             password=hashed_pw
         )
 
-        print("💾 Adding user to database...")
         db.add(new_user)
-
-        print("📤 Committing transaction...")
         db.commit()
         db.refresh(new_user)
 
-        # Generate token
+        # 🎟 Token
         token = f"token-{new_user.id}"
 
         print(f"✅ User registered successfully: {auth.email}")
-        print("📤 Sending response to frontend")
 
         return {
             "success": True,
@@ -599,61 +595,36 @@ def signup(auth: UserAuth, db: Session = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Signup error: {str(e)}")
+        print(f"❌ Signup error: {e}")
         import traceback
-        print(f"🔴 Full traceback:\n{traceback.format_exc()}")
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
-        clean_password = auth.password.strip()
-
-print("RAW PASSWORD:", repr(auth.password))
-print("CLEAN PASSWORD:", repr(clean_password))
-print("LENGTH:", len(clean_password))
-
-# ✅ HARD FIX
-clean_password = clean_password[:72]
 
        
 @app.post("/auth/login", response_model=UserResponse)
 def login(auth: UserAuth, db: Session = Depends(get_db)):
-    """Authenticate user from database."""
     print(f"📥 Incoming login request: {auth.email}")
 
-    # ✅ DB SAFETY CHECK
     if db is None:
-        print("❌ CRITICAL: Database not available")
         raise HTTPException(status_code=503, detail="Database unavailable")
 
     try:
-        print("DB SESSION TYPE:", type(db))
-
-        # Find user
-        print("🔍 Finding user...")
         user = db.query(User).filter(User.email == auth.email).first()
 
-        # Clean password (IMPORTANT FIX)
         clean_password = auth.password.strip()
 
-        if not clean_password:
-            raise HTTPException(status_code=400, detail="Password cannot be empty")
-
-        print("🔐 Verifying password...")
-        print("Input password:", repr(auth.password))
-        print("Clean password:", repr(clean_password))
+        # bcrypt safety
+        if len(clean_password) > 72:
+            clean_password = clean_password[:72]
 
         if not user:
-            print("❌ User not found")
             raise HTTPException(status_code=401, detail="Invalid email or password")
 
         if not pwd_context.verify(clean_password, user.password):
-            print("❌ Password mismatch")
             raise HTTPException(status_code=401, detail="Invalid email or password")
 
-        # Generate token
         token = f"token-{user.id}"
-
-        print(f"✅ User logged in: {auth.email}")
-        print("📤 Sending response to frontend")
 
         return {
             "success": True,
@@ -665,8 +636,6 @@ def login(auth: UserAuth, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         print(f"❌ Login error: {e}")
-        import traceback
-        print(f"🔴 Full traceback:\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail="Login failed")
 
 
