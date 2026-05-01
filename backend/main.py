@@ -1,105 +1,59 @@
 import os
-import json
-import logging
-import asyncio
 import time
-# import redis  # Temporarily disabled
+import json
+import asyncio
+import logging
+import traceback
+import re
+
 from typing import Any
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, HTTPException, Depends
+
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel
 
-# ✅ Load ENV first
-load_dotenv()
+from pydantic import BaseModel, EmailStr, validator
 
-# Logging setup (MUST be before any log usage)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-log = logging.getLogger("backend")
-
-# Redis client for distributed caching - TEMPORARILY DISABLED
-# try:
-#     redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
-#     redis_client.ping()  # Test connection
-#     REDIS_AVAILABLE = True
-#     log.info("✅ Redis connected")
-# except Exception as e:
-#     redis_client = None
-#     REDIS_AVAILABLE = False
-#     log.warning("⚠️ Redis not available: %s", e)
-
-# Mock Redis variables for compatibility
-redis_client = None
-REDIS_AVAILABLE = False
-
-# In-memory cache for recommendations with TTL (fallback)
-cache = {}  # {idea: (data, timestamp)}
-CACHE_TTL = 3600  # seconds (1 hour)
 from sqlalchemy.orm import Session
 
-from database import get_db, init_db
-from models import Stack
+from passlib.context import CryptContext
+import jwt
+from datetime import datetime, timedelta
 
-# ✅ Gemini Import
+# ------------------ ENV ------------------
+load_dotenv()
+
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger("backend")
+
+# ------------------ DATABASE ------------------
+from database import get_db, init_db
+from models import Stack, User, StackShare
+
+# ------------------ GEMINI ------------------
 try:
     import google.generativeai as genai
-except Exception as e:
+except:
     genai = None
-    log.warning("Gemini SDK not importable: %s", e)
 
-# ✅ Load API Key
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 model: Any = None
 
-# ✅ Configure Gemini
 if genai and GEMINI_API_KEY:
     try:
         genai.configure(api_key=GEMINI_API_KEY)
         model = genai.GenerativeModel(GEMINI_MODEL)
-        log.info("✅ Gemini model configured: %s", GEMINI_MODEL)
+        log.info("✅ Gemini ready")
     except Exception as e:
-        log.error("❌ Gemini config failed: %s", e)
-        model = None
-else:
-    log.warning("⚠️ Gemini not initialized")
+        log.error("Gemini error: %s", e)
 
-# ✅ FastAPI App
-app = FastAPI(title="StackMind Backend")
+# ------------------ APP ------------------
+app = FastAPI()
 
-# ✅ Startup event - init database AFTER app is created
-@app.on_event("startup")
-def startup():
-    # ✅ PATCH: Log environment status (SAFE)
-    env_status = {
-        "DATABASE_URL": bool(os.getenv("DATABASE_URL")),
-        "GEMINI_API_KEY": bool(os.getenv("GEMINI_API_KEY")),
-    }
-    print(f"🔧 Environment check: {env_status}")
-    
-    if not env_status["DATABASE_URL"]:
-        print("⚠️ WARNING: DATABASE_URL not set - auth will fail")
-    
-    try:
-        success = init_db()
-        if success:
-            log.info("✅ Database initialized on startup")
-        else:
-            log.warning("⚠️ Database initialization skipped (no DATABASE_URL)")
-    except Exception as e:
-        log.error(f"❌ Database initialization failed on startup: {e}")
-        # Don't crash the app - let it start without DB
-
-# ✅ CORS - Updated for production
-ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "https://stackmind-xi.vercel.app",  # ✅ Actual Vercel frontend URL
-    "https://your-frontend-url.vercel.app",  # Keep for flexibility
-]
-
+# ------------------ CORS ------------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -111,573 +65,192 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ PATCH: Health endpoint (NON-BREAKING)
-@app.get("/health")
-def health_check(db: Session = Depends(get_db)):
-    """Health check with DB status"""
-    return {
-        "status": "healthy" if db else "degraded",
-        "database": "connected" if db else "disconnected",
-        "timestamp": time.time()
-    }
-
-# ✅ PATCH: CORS preflight handler (NON-BREAKING)
-@app.options("/{full_path:path}")
-def options_handler(full_path: str):
-    """Handle CORS preflight requests"""
-    return JSONResponse(
-        content={},
-        headers={
-            "Access-Control-Allow-Origin": ALLOWED_ORIGINS[0] if ALLOWED_ORIGINS else "*",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
-        }
-    )
-
-# STEP 7: STARTUP LOG
-log.info("🚀 Backend running on port 8000")
-log.info("📡 CORS enabled for: %s", ALLOWED_ORIGINS)
-if model:
-    log.info("🤖 Gemini model: %s", GEMINI_MODEL)
-else:
-    log.warning("⚠️ Gemini not configured - will use fallback responses")
-
-# ✅ Global Error Handler
-@app.middleware("http")
-async def catch_exceptions(request: Request, call_next):
+# ------------------ STARTUP ------------------
+@app.on_event("startup")
+def startup():
+    print("🚀 Backend starting...")
     try:
-        return await call_next(request)
-    except HTTPException:
-        raise
+        init_db()
+        print("✅ DB initialized")
     except Exception as e:
-        log.exception("Unhandled error: %s", e)
-        return JSONResponse({"error": "Internal server error"}, status_code=500)
+        print("❌ DB error:", e)
 
-# ✅ Request Model
+# ------------------ TOKEN ------------------
+SECRET_KEY = os.getenv("SECRET_KEY", "super-secret-key")
+ALGORITHM = "HS256"
+
+def create_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(days=7)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+# ------------------ PASSWORD ------------------
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# ------------------ MODELS ------------------
 class IdeaRequest(BaseModel):
     idea: str
-
-
-# 🛡️ FAULT-TOLERANT FALLBACK RESPONSE
-FALLBACK_RESPONSE = {
-    "architecture": "AI-generated architecture for your idea. The system includes a modern frontend (React/Vue), scalable backend (Node.js/Python), and cloud deployment infrastructure.",
-    "core_technologies": ["React", "Node.js", "FastAPI", "PostgreSQL", "Redis", "Docker", "AWS"],
-    "deployment": "Cloud deployment using Docker containers on AWS/GCP with CI/CD pipeline and auto-scaling.",
-    "roadmap": ["Define MVP scope and core features", "Build frontend and backend infrastructure", "Deploy MVP and gather user feedback", "Scale and optimize for production"]
-}
-
-# ------------------ HELPERS ------------------
-
-import re
-
-def extract_json(text):
-    """Extract and parse JSON from text, return partial data if parsing fails."""
-    import json
-    
-    if not text or not isinstance(text, str):
-        print("⚠️ Empty text in extract_json")
-        return {
-            "architecture": "",
-            "core_technologies": [],
-            "deployment": "",
-            "roadmap": []
-        }
-    
-    print(f"📝 EXTRACT_JSON INPUT: {text[:200]}...")
-    
-    # Remove markdown code blocks
-    clean_text = re.sub(r'```json\s*', '', text, flags=re.IGNORECASE)
-    clean_text = re.sub(r'```\s*', '', clean_text)
-    clean_text = clean_text.strip()
-    
-    print(f"🧹 CLEANED TEXT: {clean_text[:200]}...")
-    
-    # Try to find JSON object using regex
-    try:
-        match = re.search(r'\{.*\}', clean_text, re.DOTALL)
-        if match:
-            json_str = match.group(0)  # Use group(0) not group()
-            print(f"🔍 FOUND JSON BLOCK: {json_str[:200]}...")
-            parsed = json.loads(json_str)
-            print(f"✅ JSON PARSED SUCCESSFULLY: {parsed}")
-            return parsed
-    except Exception as e:
-        print(f"❌ JSON parse error: {e}")
-    
-    # Fallback: try direct json.loads
-    try:
-        print("🔄 Trying direct json.loads...")
-        parsed = json.loads(clean_text)
-        print(f"✅ DIRECT PARSE SUCCESS: {parsed}")
-        return parsed
-    except Exception as e:
-        print(f"❌ Direct parse failed: {e}")
-    
-    # STEP 4: Return partial structured object with raw text as architecture
-    print("⚠️ Using RAW TEXT FALLBACK - preserving AI output")
-    return {
-        "architecture": text[:500],  # STEP 4: preserve AI output
-        "core_technologies": [],
-        "deployment": "",
-        "roadmap": []
-    }
-
-
-def normalize_response(data, raw_text=""):
-    """Normalize response - preserve AI data, only fill missing fields."""
-    print(f"🔄 NORMALIZE INPUT: {data}")
-    
-    # STEP 6: Ensure data is at least an empty dict
-    if not data or not isinstance(data, dict):
-        print("⚠️ normalize_response: data is not dict, using empty")
-        data = {}
-    
-    # STEP 6: Preserve AI data, only fill missing
-    result = {
-        "architecture": data.get("architecture", ""),
-        "core_technologies": data.get("core_technologies", []),
-        "deployment": data.get("deployment", ""),
-        "roadmap": data.get("roadmap", [])
-    }
-    
-    # Convert any dict values to appropriate types
-    if isinstance(result["architecture"], dict):
-        result["architecture"] = json.dumps(result["architecture"], indent=2)
-    if isinstance(result["deployment"], dict):
-        result["deployment"] = json.dumps(result["deployment"], indent=2)
-    if isinstance(result["core_technologies"], dict):
-        result["core_technologies"] = list(result["core_technologies"].values())
-    if isinstance(result["roadmap"], dict):
-        result["roadmap"] = list(result["roadmap"].values())
-    
-    print(f"✅ NORMALIZE OUTPUT: {result}")
-    return result
-
-
-def get_response_text(resp):
-    try:
-        return resp.text
-    except:
-        try:
-            return resp.candidates[0].content.parts[0].text
-        except:
-            return str(resp)
-
-
-# ------------------ ROUTES ------------------
-
-@app.get("/")
-def root():
-    return {"status": "Backend running 🚀"}
-
-
-@app.get("/health")
-def health_check():
-    """Health check endpoint for Render."""
-    return {
-        "status": "healthy",
-        "timestamp": time.time(),
-        "redis": REDIS_AVAILABLE,
-        "gemini": model is not None
-    }
-
-
-# 🚀 RECOMMEND (LLM) - DIAGNOSTIC VERSION - STEP 1 & 2: FORCE RAW OUTPUT
-@app.post("/recommend")
-async def recommend(req: IdeaRequest):
-    print("\n" + "="*60)
-    print("🔥 API HIT - /recommend endpoint called")
-    
-    try:
-        idea = (req.idea or "").strip()
-        print(f"👉 Input idea: '{idea}'")
-        
-        if not idea:
-            print("⚠️ Empty idea - returning test response")
-            return {
-                "architecture": "Empty idea provided - test response",
-                "core_technologies": ["Test"],
-                "deployment": "Test deployment",
-                "roadmap": ["Step 1"]
-            }
-        
-        # Check if model is available
-        if not model:
-            print("❌ Gemini model not available")
-            return {
-                "architecture": "Gemini not configured",
-                "core_technologies": ["Error"],
-                "deployment": "Error",
-                "roadmap": ["Error"]
-            }
-        
-        # STEP 1: Build enhanced prompt with new optional fields
-        prompt = f"""Generate a comprehensive tech stack for: {idea}
-
-Return ONLY valid JSON with ALL fields:
-{{
-  "architecture": "brief description",
-  "core_technologies": ["tech1", "tech2", "tech3"],
-  "deployment": "deployment method",
-  "roadmap": ["step 1", "step 2"],
-  "architecture_diagram": {{
-    "nodes": [
-      {{"id": "frontend", "label": "Frontend", "type": "component"}},
-      {{"id": "backend", "label": "Backend", "type": "service"}},
-      {{"id": "database", "label": "Database", "type": "data"}}
-    ],
-    "edges": [
-      {{"from": "frontend", "to": "backend", "label": "API"}},
-      {{"from": "backend", "to": "database", "label": "queries"}}
-    ]
-  }},
-  "roadmap_phases": [
-    {{
-      "phase": "Phase 1: Foundation",
-      "items": ["Setup project", "Define architecture", "Choose tech stack"]
-    }},
-    {{
-      "phase": "Phase 2: Development",
-      "items": ["Build frontend", "Develop backend", "Setup database"]
-    }}
-  ],
-  "deployment_structured": {{
-    "platform": "AWS/Vercel/Heroku",
-    "strategy": "CI/CD pipeline",
-    "monitoring": "Logging and metrics",
-    "scaling": "Auto-scaling configuration"
-  }}
-}}
-
-IMPORTANT: Include all fields for complete solution."""
-        
-        print(f"📝 Prompt built: {prompt[:200]}...")
-        
-        # STEP 1: Call Gemini
-        print("🤖 Calling Gemini...")
-        resp = model.generate_content(prompt)
-        print(f"✅ Got response object: {type(resp)}")
-        
-        # STEP 1: Extract text safely
-        def get_text(resp):
-            try:
-                return resp.text
-            except:
-                try:
-                    return resp.candidates[0].content.parts[0].text
-                except:
-                    return ""
-        
-        raw = get_text(resp)
-        print(f"🔥 RAW GEMINI OUTPUT:\n{raw}\n")
-        print(f"📊 Length: {len(raw)} characters")
-        
-        # STEP 2: TEMPORARY BYPASS - Return raw directly structured
-        # STEP 3: NO FALLBACK - Just return what we got
-        if not raw:
-            print("❌ Empty response from Gemini")
-            return {
-                "architecture": "Gemini returned empty response",
-                "core_technologies": ["Error"],
-                "deployment": "Error",
-                "roadmap": ["Error"]
-            }
-        
-        # STEP 6: Simple safe parsing
-        print("🔧 Attempting to parse JSON...")
-        import json, re
-        
-        def simple_extract(text):
-            try:
-                match = re.search(r'\{.*\}', text, re.DOTALL)
-                if match:
-                    return json.loads(match.group(0))
-            except Exception as e:
-                print(f"⚠️ JSON parse error: {e}")
-            
-            # Return raw text as architecture if JSON fails - include new fields
-            return {
-                "architecture": text,
-                "core_technologies": [],
-                "deployment": "",
-                "roadmap": [],
-                "architecture_diagram": {"nodes": [], "edges": []},
-                "roadmap_phases": [],
-                "deployment_structured": {}
-            }
-        
-        parsed = simple_extract(raw)
-        print(f"✅ Parsed: {parsed}")
-        
-        # Ensure basic structure with new optional fields
-        result = {
-            "architecture": parsed.get("architecture", raw[:500]),
-            "core_technologies": parsed.get("core_technologies", []),
-            "deployment": parsed.get("deployment", ""),
-            "roadmap": parsed.get("roadmap", []),
-            "architecture_diagram": parsed.get("architecture_diagram", {"nodes": [], "edges": []}),
-            "roadmap_phases": parsed.get("roadmap_phases", []),
-            "deployment_structured": parsed.get("deployment_structured", {})
-        }
-        
-        print(f"✅ FINAL RESULT: {result}")
-        print("="*60 + "\n")
-        
-        return result
-        
-    except Exception as e:
-        print(f"🔥 CRITICAL ERROR: {e}")
-        import traceback
-        traceback.print_exc()
-        return {
-            "architecture": f"Error: {str(e)}",
-            "core_technologies": ["Error"],
-            "deployment": "Error",
-            "roadmap": ["Error"]
-        }
-
-@app.post("/recommend-stream")
-async def recommend_stream(data: IdeaRequest):
-    idea = data.idea
-
-    async def stream_generator():
-        try:
-            prompt = f"""
-            Give a tech stack for:
-            {idea}
-
-            Return JSON with:
-            architecture, core_technologies, deployment, roadmap
-            """
-
-            response = model.generate_content(prompt)
-
-            text = response.text if hasattr(response, "text") else str(response)
-
-            # Simulate streaming (token by token)
-            for chunk in text.split(" "):
-                yield chunk + " "
-                await asyncio.sleep(0.02)  # typing effect speed
-
-        except Exception as e:
-            yield f"ERROR: {str(e)}"
-
-    return StreamingResponse(stream_generator(), media_type="text/plain")
-
-
-# 💾 SAVE STACK
-@app.post("/save-stack")
-def save_stack(data: dict, db: Session = Depends(get_db)):
-    try:
-        stack = Stack(
-            idea=data.get("idea"),
-            architecture=data.get("architecture"),
-            core_technologies=data.get("core_technologies"),
-            deployment=data.get("deployment"),
-            roadmap=data.get("roadmap"),
-        )
-        db.add(stack)
-        db.commit()
-        db.refresh(stack)
-
-        return {"message": "Saved", "id": stack.id}
-
-    except Exception as e:
-        raise HTTPException(500, str(e))
-
-
-# 📜 GET HISTORY
-@app.get("/stacks")
-def get_stacks(db: Session = Depends(get_db)):
-    stacks = db.query(Stack).order_by(Stack.created_at.desc()).all()
-
-    return [
-        {
-            "id": s.id,
-            "idea": s.idea,
-            "architecture": s.architecture,
-            "core_technologies": s.core_technologies,
-            "deployment": s.deployment,
-            "roadmap": s.roadmap,
-        }
-        for s in stacks
-    ]
-
-
-# 🔐 AUTH ROUTES - Database Based
-from pydantic import BaseModel, EmailStr, validator
-from passlib.context import CryptContext
-from sqlalchemy.orm import Session
-from database import get_db
-from models import User
-
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class UserAuth(BaseModel):
     email: EmailStr
     password: str
-    
-    @validator('password')
+
+    @validator("password")
     def validate_password(cls, v):
-        v = v.strip()
-        # ✅ FIX: Only enforce min length, let bcrypt handle max
-        if len(v) < 6:
-            raise ValueError('Password must be at least 6 characters')
+        if len(v.strip()) < 6:
+            raise ValueError("Password must be at least 6 characters")
         return v
 
-class UserResponse(BaseModel):
-    success: bool
-    token: str
-    user: dict
+# ------------------ ROOT ------------------
+@app.get("/")
+def root():
+    return {"status": "running"}
 
-import traceback
+# ------------------ HEALTH ------------------
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
+# ------------------ RECOMMEND ------------------
+@app.post("/recommend")
+async def recommend(req: IdeaRequest):
+    try:
+        idea = req.idea.strip()
+
+        if not idea:
+            raise HTTPException(400, "Idea required")
+
+        if not model:
+            return {"architecture": "Gemini not configured"}
+
+        prompt = f"""
+        Give tech stack for: {idea}
+        Return JSON with:
+        architecture, core_technologies, deployment, roadmap
+        """
+
+        resp = model.generate_content(prompt)
+        raw = resp.text if hasattr(resp, "text") else str(resp)
+
+        try:
+            match = re.search(r"\{.*\}", raw, re.DOTALL)
+            parsed = json.loads(match.group(0)) if match else {}
+        except:
+            parsed = {}
+
+        return {
+            "architecture": parsed.get("architecture", raw[:300]),
+            "core_technologies": parsed.get("core_technologies", []),
+            "deployment": parsed.get("deployment", ""),
+            "roadmap": parsed.get("roadmap", [])
+        }
+
+    except Exception as e:
+        print("Recommend error:", e)
+        raise HTTPException(500, str(e))
+
+# ------------------ STREAM ------------------
+@app.post("/recommend-stream")
+async def recommend_stream(data: IdeaRequest):
+    async def generator():
+        try:
+            resp = model.generate_content(data.idea)
+            text = resp.text
+
+            for chunk in text.split():
+                yield chunk + " "
+                await asyncio.sleep(0.02)
+
+        except Exception as e:
+            yield f"ERROR: {str(e)}"
+
+    return StreamingResponse(generator(), media_type="text/plain")
+
+# ------------------ SAVE ------------------
+@app.post("/save-stack")
+def save_stack(data: dict, db: Session = Depends(get_db)):
+    stack = Stack(**data)
+    db.add(stack)
+    db.commit()
+    db.refresh(stack)
+    return {"id": stack.id}
+
+# ------------------ GET STACKS ------------------
+@app.get("/stacks")
+def get_stacks(db: Session = Depends(get_db)):
+    return db.query(Stack).all()
+
+# ------------------ SIGNUP ------------------
 @app.post("/auth/signup")
 def signup(auth: UserAuth, db: Session = Depends(get_db)):
     try:
-        # Clean inputs
         email = auth.email.strip().lower()
         password = auth.password.strip()
 
-        # Validate
-        if not password:
-            raise HTTPException(status_code=400, detail="Password cannot be empty")
-
-        if len(password) < 6:
-            raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
-
-        # 🔥 CRITICAL FIX — ALWAYS LIMIT BEFORE HASHING
+        # 🔥 IMPORTANT
         password = password[:72]
 
-        # Hash password
-        hashed_pw = pwd_context.hash(password)
-
-        # Check if user exists
         existing = db.query(User).filter(User.email == email).first()
         if existing:
-            raise HTTPException(status_code=400, detail="User already exists")
+            raise HTTPException(400, "User already exists")
 
-        # Create user
-        new_user = User(email=email, password=hashed_pw)
-        db.add(new_user)
+        hashed = pwd_context.hash(password)
+
+        user = User(email=email, password=hashed)
+        db.add(user)
         db.commit()
-        db.refresh(new_user)
-
-        # Generate token
-        token = create_token({"sub": new_user.email})
-
-        return {
-            "success": True,
-            "token": token,
-            "user": {
-                "id": new_user.id,
-                "email": new_user.email
-            }
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        print("Signup error:", str(e))
-        print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail="Registration failed")
-
-       
-@app.post("/auth/login")
-def login(auth: UserAuth, db: Session = Depends(get_db)):
-    try:
-        email = auth.email.strip().lower()
-        password = auth.password.strip()
-
-        user = db.query(User).filter(User.email == email).first()
-
-        if not user:
-            raise HTTPException(status_code=401, detail="Invalid email or password")
-
-        # 🔥 Match SAME truncation logic
-        password = password[:72]
-
-        if not pwd_context.verify(password, user.password):
-            raise HTTPException(status_code=401, detail="Invalid email or password")
+        db.refresh(user)
 
         token = create_token({"sub": user.email})
 
         return {
             "success": True,
             "token": token,
-            "user": {
-                "id": user.id,
-                "email": user.email
-            }
+            "user": {"id": user.id, "email": user.email}
         }
 
-    except HTTPException:
-        raise
     except Exception as e:
-        print("Login error:", str(e))
-        raise HTTPException(status_code=500, detail="Login failed")
-
-
-
-# 🔗 SHARE STACK ENDPOINTS (NEW)
-@app.post("/share")
-def share_stack(data: dict, db: Session = Depends(get_db)):
-    """Save stack data and return shareable ID."""
-    try:
-        from models import StackShare
-        
-        share = StackShare(
-            data=data  # Store the entire stack result as JSON
-        )
-        db.add(share)
-        db.commit()
-        db.refresh(share)
-
-        return {"id": share.id, "message": "Stack shared successfully"}
-
-    except Exception as e:
+        print("Signup error:", e)
         raise HTTPException(500, str(e))
 
-
-@app.get("/share/{share_id}")
-def get_shared_stack(share_id: str, db: Session = Depends(get_db)):
-    """Retrieve shared stack by ID."""
+# ------------------ LOGIN ------------------
+@app.post("/auth/login")
+def login(auth: UserAuth, db: Session = Depends(get_db)):
     try:
-        from models import StackShare
-        
-        share = db.query(StackShare).filter(StackShare.id == share_id).first()
-        
-        if not share:
-            raise HTTPException(404, "Shared stack not found")
+        email = auth.email.strip().lower()
+        password = auth.password.strip()[:72]
+
+        user = db.query(User).filter(User.email == email).first()
+
+        if not user or not pwd_context.verify(password, user.password):
+            raise HTTPException(401, "Invalid email or password")
+
+        token = create_token({"sub": user.email})
 
         return {
-            "id": share.id,
-            "data": share.data,
-            "created_at": share.created_at.isoformat() if share.created_at else None
+            "success": True,
+            "token": token,
+            "user": {"id": user.id, "email": user.email}
         }
 
-    except HTTPException:
-        raise
     except Exception as e:
+        print("Login error:", e)
         raise HTTPException(500, str(e))
 
+# ------------------ SHARE ------------------
+@app.post("/share")
+def share_stack(data: dict, db: Session = Depends(get_db)):
+    share = StackShare(data=data)
+    db.add(share)
+    db.commit()
+    db.refresh(share)
+    return {"id": share.id}
 
-@app.get("/health")
-def health():
-    return {
-        "status": "ok",
-        "db": "connected" if SessionLocal else "not configured"
-    }
-
-@app.on_event("startup")
-def check_env():
-    print("🚀 Backend starting...")
-
-    if not os.getenv("DATABASE_URL"):
-        print("❌ DATABASE_URL missing")
-
-    if not os.getenv("GEMINI_API_KEY"):
-        print("⚠️ GEMINI_API_KEY missing")
-
+@app.get("/share/{id}")
+def get_share(id: str, db: Session = Depends(get_db)):
+    share = db.query(StackShare).filter(StackShare.id == id).first()
+    if not share:
+        raise HTTPException(404, "Not found")
+    return share
         
