@@ -52,7 +52,11 @@ export default function Auth() {
       console.log("Signup response:", data);
 
       if (!res.ok || !data.success) {
-        throw new Error(data.detail || "Signup failed");
+        throw new Error(
+        Array.isArray(data.detail)
+        ? data.detail[0].msg
+        : data.detail || "Something went wrong"
+        )
       }
 
       localStorage.setItem("token", data.token);
