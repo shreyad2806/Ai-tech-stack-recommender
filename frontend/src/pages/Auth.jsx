@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Mail, Lock, EyeOff, Eye } from "lucide-react";
 
 // 🌐 API Configuration
-const API_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, ''); // Remove trailing slash
+const API_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
 console.log("API URL:", API_URL);
 console.log("Final signup URL:", `${API_URL}/auth/signup`);
 
@@ -19,10 +19,16 @@ export default function Auth() {
 
   const handleSignup = async () => {
     try {
+      // ✅ FIX: Trim inputs before sending
+      const trimmedEmail = email.trim();
+      const trimmedPassword = password.trim();
+      
+      console.log("📤 Sending signup:", { email: trimmedEmail, passwordLength: trimmedPassword.length });
+      
       const signupRes = await fetch(`${API_URL}/auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: trimmedEmail, password: trimmedPassword }),
       });
       console.log("Signup response status:", signupRes.status);
 
@@ -45,17 +51,25 @@ export default function Auth() {
       navigate("/dashboard");
 
     } catch (err) {
-      if (import.meta.env.DEV) console.error("Signup error:", err);
-      alert(err.message || "Signup failed");
+      // ✅ FIX: Safe error message extraction
+      const errorMsg = err?.message || err?.toString?.() || "Signup failed";
+      console.error("Signup error:", err);
+      alert(typeof errorMsg === "string" ? errorMsg : "Signup failed");
     }
   };
 
   const handleLogin = async () => {
     try {
+      // ✅ FIX: Trim inputs before sending
+      const trimmedEmail = email.trim();
+      const trimmedPassword = password.trim();
+      
+      console.log("📤 Sending login:", { email: trimmedEmail, passwordLength: trimmedPassword.length });
+      
       const res = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: trimmedEmail, password: trimmedPassword }),
       });
       console.log("Login response status:", res.status);
 
@@ -77,8 +91,10 @@ export default function Auth() {
       navigate("/dashboard");
 
     } catch (err) {
-      if (import.meta.env.DEV) console.error("Login error:", err);
-      alert(err.message || "Login failed");
+      // ✅ FIX: Safe error message extraction
+      const errorMsg = err?.message || err?.toString?.() || "Login failed";
+      console.error("Login error:", err);
+      alert(typeof errorMsg === "string" ? errorMsg : "Login failed");
     }
   };
 
