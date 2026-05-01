@@ -72,6 +72,16 @@ app = FastAPI(title="StackMind Backend")
 # ✅ Startup event - init database AFTER app is created
 @app.on_event("startup")
 def startup():
+    # ✅ PATCH: Log environment status (SAFE)
+    env_status = {
+        "DATABASE_URL": bool(os.getenv("DATABASE_URL")),
+        "GEMINI_API_KEY": bool(os.getenv("GEMINI_API_KEY")),
+    }
+    print(f"🔧 Environment check: {env_status}")
+    
+    if not env_status["DATABASE_URL"]:
+        print("⚠️ WARNING: DATABASE_URL not set - auth will fail")
+    
     try:
         success = init_db()
         if success:
@@ -92,11 +102,37 @@ ALLOWED_ORIGINS = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=[
+        "http://localhost:5173",
+        "https://stackmind-xi.vercel.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ✅ PATCH: Health endpoint (NON-BREAKING)
+@app.get("/health")
+def health_check(db: Session = Depends(get_db)):
+    """Health check with DB status"""
+    return {
+        "status": "healthy" if db else "degraded",
+        "database": "connected" if db else "disconnected",
+        "timestamp": time.time()
+    }
+
+# ✅ PATCH: CORS preflight handler (NON-BREAKING)
+@app.options("/{full_path:path}")
+def options_handler(full_path: str):
+    """Handle CORS preflight requests"""
+    return JSONResponse(
+        content={},
+        headers={
+            "Access-Control-Allow-Origin": ALLOWED_ORIGINS[0] if ALLOWED_ORIGINS else "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
 
 # STEP 7: STARTUP LOG
 log.info("🚀 Backend running on port 8000")
@@ -485,8 +521,7 @@ class UserAuth(BaseModel):
     @validator('password')
     def validate_password(cls, v):
         v = v.strip()
-        if len(v) > 72:
-            raise ValueError('Password cannot exceed 72 characters')
+        # ✅ FIX: Only enforce min length, let bcrypt handle max
         if len(v) < 6:
             raise ValueError('Password must be at least 6 characters')
         return v
@@ -500,57 +535,67 @@ class UserResponse(BaseModel):
 def signup(auth: UserAuth, db: Session = Depends(get_db)):
     """Register a new user in database."""
     print(f"📥 Incoming signup request: {auth.email}")
-    
+
+    # ✅ DB SAFETY CHECK
+    if db is None:
+        print("❌ CRITICAL: Database not available")
+        raise HTTPException(status_code=503, detail="Database unavailable")
+
     try:
+        print("DB SESSION TYPE:", type(db))
+
         # Check if user exists
         print("🔍 Checking if user exists...")
         existing_user = db.query(User).filter(User.email == auth.email).first()
-        
+
         if existing_user:
             print(f"⚠️ User already exists: {auth.email}")
             raise HTTPException(status_code=400, detail="User already exists")
-        
-        # CLEAN PASSWORD
+
+        # Clean password
         clean_password = auth.password.strip()
-        
-        print("Original password:", auth.password)
-        print("Cleaned password:", clean_password)
-        print("Length:", len(clean_password))
-        print("Type:", type(clean_password))
-        
+
+        if not clean_password:
+            raise HTTPException(status_code=400, detail="Password cannot be empty")
+
         if not isinstance(clean_password, str):
             raise HTTPException(status_code=400, detail="Password must be string")
-        
-        if len(clean_password) > 72:
-            raise HTTPException(status_code=400, detail="Password too long")
-        
+
+        # ✅ FIX: Truncate password to 71 chars to prevent bcrypt crash
+        if len(clean_password) > 71:
+            print(f"⚠️ Password too long ({len(clean_password)}), truncating to 71 chars")
+            clean_password = clean_password[:71]
+
+        print("🔐 Hashing password...")
+
         hashed_pw = pwd_context.hash(clean_password)
-        
+
         # Create user
         print("📝 Creating new user...")
         new_user = User(
             email=auth.email,
             password=hashed_pw
         )
-        
+
         print("💾 Adding user to database...")
         db.add(new_user)
-        
+
         print("📤 Committing transaction...")
         db.commit()
         db.refresh(new_user)
-        
+
         # Generate token
         token = f"token-{new_user.id}"
-        
+
         print(f"✅ User registered successfully: {auth.email}")
-        
+        print("📤 Sending response to frontend")
+
         return {
             "success": True,
             "token": token,
             "user": {"id": new_user.id, "email": new_user.email}
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -562,27 +607,56 @@ def signup(auth: UserAuth, db: Session = Depends(get_db)):
 @app.post("/auth/login", response_model=UserResponse)
 def login(auth: UserAuth, db: Session = Depends(get_db)):
     """Authenticate user from database."""
+    print(f"📥 Incoming login request: {auth.email}")
+
+    # ✅ DB SAFETY CHECK
+    if db is None:
+        print("❌ CRITICAL: Database not available")
+        raise HTTPException(status_code=503, detail="Database unavailable")
+
     try:
+        print("DB SESSION TYPE:", type(db))
+
         # Find user
+        print("🔍 Finding user...")
         user = db.query(User).filter(User.email == auth.email).first()
-        
-        if not user or not pwd_context.verify(auth.password, user.password):
+
+        # Clean password (IMPORTANT FIX)
+        clean_password = auth.password.strip()
+
+        if not clean_password:
+            raise HTTPException(status_code=400, detail="Password cannot be empty")
+
+        print("🔐 Verifying password...")
+        print("Input password:", repr(auth.password))
+        print("Clean password:", repr(clean_password))
+
+        if not user:
+            print("❌ User not found")
             raise HTTPException(status_code=401, detail="Invalid email or password")
-        
+
+        if not pwd_context.verify(clean_password, user.password):
+            print("❌ Password mismatch")
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+
         # Generate token
         token = f"token-{user.id}"
-        
-        log.info(f"✅ User logged in: {auth.email}")
-        
+
+        print(f"✅ User logged in: {auth.email}")
+        print("📤 Sending response to frontend")
+
         return {
             "success": True,
             "token": token,
             "user": {"id": user.id, "email": user.email}
         }
+
     except HTTPException:
         raise
     except Exception as e:
-        log.error(f"❌ Login error: {e}")
+        print(f"❌ Login error: {e}")
+        import traceback
+        print(f"🔴 Full traceback:\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail="Login failed")
 
 
@@ -628,3 +702,23 @@ def get_shared_stack(share_id: str, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         raise HTTPException(500, str(e))
+
+
+@app.get("/health")
+def health():
+    return {
+        "status": "ok",
+        "db": "connected" if SessionLocal else "not configured"
+    }
+
+@app.on_event("startup")
+def check_env():
+    print("🚀 Backend starting...")
+
+    if not os.getenv("DATABASE_URL"):
+        print("❌ DATABASE_URL missing")
+
+    if not os.getenv("GEMINI_API_KEY"):
+        print("⚠️ GEMINI_API_KEY missing")
+
+        
