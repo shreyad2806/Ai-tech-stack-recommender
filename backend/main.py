@@ -533,45 +533,34 @@ class UserResponse(BaseModel):
 
 @app.post("/auth/signup", response_model=UserResponse)
 def signup(auth: UserAuth, db: Session = Depends(get_db)):
-    """Register a new user in database."""
-    print(f"📥 Incoming signup request: {auth.email}")
-
-    # ✅ DB SAFETY
-    if db is None:
-        print("❌ Database not available")
-        raise HTTPException(status_code=503, detail="Database unavailable")
+    print(f"📥 Signup: {auth.email}")
 
     try:
-        # 🔍 Check if user exists
+        # Check existing user
         existing_user = db.query(User).filter(User.email == auth.email).first()
         if existing_user:
             raise HTTPException(status_code=400, detail="User already exists")
 
-        # 🔐 Clean password
+        # ✅ CLEAN PASSWORD ONCE (ONLY ONCE)
         clean_password = auth.password.strip()
 
         if not clean_password:
             raise HTTPException(status_code=400, detail="Password cannot be empty")
 
-        if not isinstance(clean_password, str):
-            raise HTTPException(status_code=400, detail="Password must be string")
+        if len(clean_password) < 6:
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
 
-        # 🔍 DEBUG (IMPORTANT)
-        print("RAW PASSWORD:", repr(auth.password))
-        print("CLEAN PASSWORD:", repr(clean_password))
-        print("LENGTH:", len(clean_password))
-
-        # ✅ BCRYPT SAFETY FIX
+        # ✅ CRITICAL FIX: truncate BEFORE hashing
         if len(clean_password) > 72:
             print("⚠️ Truncating password to 72 chars")
             clean_password = clean_password[:72]
 
-        print("🔥 Hashing password...")
+        print("DEBUG LENGTH:", len(clean_password))
 
+        # ✅ HASH AFTER truncation
         hashed_pw = pwd_context.hash(clean_password)
 
-        # 🧑‍💻 Create user
-        print("📝 Creating new user...")
+        # Create user
         new_user = User(
             email=auth.email,
             password=hashed_pw
@@ -581,23 +570,14 @@ def signup(auth: UserAuth, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(new_user)
 
-        # 🎟 Token
-        token = f"token-{new_user.id}"
-
-        print(f"✅ User registered successfully: {auth.email}")
-
         return {
             "success": True,
-            "token": token,
+            "token": f"token-{new_user.id}",
             "user": {"id": new_user.id, "email": new_user.email}
         }
 
-    except HTTPException:
-        raise
     except Exception as e:
-        print(f"❌ Signup error: {e}")
-        import traceback
-        print(traceback.format_exc())
+        print("❌ Signup error:", str(e))
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
 
