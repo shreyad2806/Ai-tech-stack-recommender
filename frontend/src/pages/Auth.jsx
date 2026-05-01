@@ -19,17 +19,35 @@ export default function Auth() {
 
   const handleSignup = async () => {
     try {
-      // ✅ FIX: Trim inputs before sending
-      const trimmedEmail = email.trim();
-      const trimmedPassword = password.trim();
-      
-      console.log("📤 Sending signup:", { email: trimmedEmail, passwordLength: trimmedPassword.length });
-      
-      const signupRes = await fetch(`${API_URL}/auth/signup`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: trimmedEmail, password: trimmedPassword }),
-      });
+      const cleanEmail = email.trim();
+const cleanPassword = password.trim();
+const cleanConfirm = confirmPassword.trim();
+
+// ✅ VALIDATION
+if (cleanPassword !== cleanConfirm) {
+  alert("Passwords do not match");
+  return;
+}
+
+if (cleanPassword.length < 6) {
+  alert("Password must be at least 6 characters");
+  return;
+}
+
+// 🚨 DEBUG (IMPORTANT)
+console.log("Password length:", cleanPassword.length);
+console.log("Password value:", JSON.stringify(cleanPassword));
+
+const res = await fetch(`${API_URL}/auth/signup`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    email: cleanEmail,
+    password: cleanPassword
+  })
+});
       console.log("Signup response status:", signupRes.status);
 
       let signupData;
