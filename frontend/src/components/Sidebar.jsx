@@ -4,27 +4,14 @@ import { useEffect, useState } from "react";
 // 🌐 API Configuration
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
-export default function Sidebar({ onNewChat }) {
+export default function Sidebar({ onNewChat, setResult, setInput }) {
   const [history, setHistory] = useState([]);
 
-  // ✅ Fetch history from backend
+  // ✅ Load chat history from localStorage
   useEffect(() => {
-    fetch(`${API_URL}/stacks`)
-      .then((res) => res.json())
-      .then((data) => {
-        // ✅ FIX: Ensure data is always an array
-        if (Array.isArray(data)) {
-          if (import.meta.env.DEV) console.log("History loaded:", data);
-          setHistory(data);
-        } else {
-          console.error("Invalid response: expected array, got:", typeof data);
-          setHistory([]); // Fallback to empty array
-        }
-      })
-      .catch((err) => {
-        if (import.meta.env.DEV) console.error("History error:", err);
-        setHistory([]); // ✅ Ensure array on error
-      });
+    const stored = JSON.parse(localStorage.getItem("history") || "[]");
+    if (import.meta.env.DEV) console.log("History loaded from localStorage:", stored);
+    setHistory(stored);
   }, []);
 
   return (
@@ -66,11 +53,20 @@ export default function Sidebar({ onNewChat }) {
           {!Array.isArray(history) || history.length === 0 ? (
             <p className="text-xs text-gray-500">No history yet</p>
           ) : (
-            history.map((item) => (
+            Array.isArray(history) && history.map((item, i) => (
               <div
-                key={item.id}
+                key={i}
                 className="p-2 text-sm text-gray-300 truncate rounded cursor-pointer hover:bg-white/5"
                 title={item.idea}
+                onClick={() => {
+                  if (setResult && setInput) {
+                    setResult(item.result);
+                    setInput(item.idea);
+                    // Also update localStorage to keep in sync
+                    localStorage.setItem("lastStack", JSON.stringify(item.result));
+                    localStorage.setItem("lastIdea", item.idea);
+                  }
+                }}
               >
                 {item.idea}
               </div>

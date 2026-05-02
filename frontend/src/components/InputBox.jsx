@@ -422,9 +422,19 @@ export default function InputBox({ input, setInput, result, setResult }) {
       
       setResult(normalized);
 
-      // 💾 Save to localStorage
-      localStorage.setItem("lastStack", JSON.stringify(data));
+      // 💾 Save to localStorage (use normalized for consistency)
+      localStorage.setItem("lastStack", JSON.stringify(normalized));
       localStorage.setItem("lastIdea", idea);
+
+      // 📝 Save to chat history
+      const history = JSON.parse(localStorage.getItem("history") || "[]");
+      history.unshift({
+        idea: idea,
+        result: normalized,
+        time: Date.now()
+      });
+      // keep only last 10
+      localStorage.setItem("history", JSON.stringify(history.slice(0, 10)));
 
     } catch (err) {
       if (import.meta.env.DEV) console.error("Frontend error:", err);

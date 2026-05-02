@@ -55,12 +55,30 @@ export default function Dashboard() {
     setIsLoading(false);
   }, [navigate]);
 
-  // Load saved data
+  // ✅ Restore state on mount (runs immediately)
+  useEffect(() => {
+    try {
+      const savedStack = localStorage.getItem("lastStack");
+      const savedIdea = localStorage.getItem("lastIdea");
+
+      if (savedStack) {
+        setResult(JSON.parse(savedStack));
+      }
+
+      if (savedIdea) {
+        setInput(savedIdea);
+      }
+    } catch (err) {
+      console.error("Restore failed:", err);
+    }
+  }, []);
+
+  // Load saved data (after auth check)
   useEffect(() => {
     if (!authChecked) return;
-    
+
     if (import.meta.env.DEV) console.log("Dashboard: Loading saved data...");
-    
+
     const saved = localStorage.getItem("lastStack");
     if (saved) {
       try {
@@ -124,12 +142,17 @@ export default function Dashboard() {
     <div className="min-h-screen w-full bg-[#050508] flex font-sans overflow-hidden">
       
       {/* Sidebar */}
-      <Sidebar onNewChat={() => {
-        setResult(null);
-        setInput("");
-        localStorage.removeItem("lastStack");
-        localStorage.removeItem("lastIdea");
-      }} />
+      <Sidebar 
+        onNewChat={() => {
+          setResult(null);
+          setInput("");
+          localStorage.removeItem("lastStack");
+          localStorage.removeItem("lastIdea");
+          localStorage.removeItem("history");
+        }}
+        setResult={setResult}
+        setInput={setInput}
+      />
 
       {/* Main */}
       <main className="relative flex flex-col flex-1 h-screen overflow-y-auto">
