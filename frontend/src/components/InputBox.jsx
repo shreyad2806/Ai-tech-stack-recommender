@@ -33,7 +33,10 @@ import jsPDF from "jspdf";
 import ArchitectureDiagram from "./ArchitectureDiagram";
 
 // 🌐 API Configuration
-const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+const API_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || "http://127.0.0.1:8000";
+
+// Debug: Log API URL
+if (import.meta.env.DEV) console.log('InputBox.jsx - API URL:', API_URL);
 
 // 🛡️ SAFE DATA PARSING - Step 1: Fix data handling
 const safeParseResult = (result) => {
@@ -402,6 +405,12 @@ export default function InputBox({ input, setInput, result, setResult }) {
         },
         body: JSON.stringify({ idea }),
       });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error(`HTTP ${res.status}: ${res.statusText}`, errorText);
+        throw new Error(`Request failed: ${res.status} ${res.statusText}`);
+      }
 
       // STEP 8: LOG RAW API RESPONSE
       const text = await res.text();

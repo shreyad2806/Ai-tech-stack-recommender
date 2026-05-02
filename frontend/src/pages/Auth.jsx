@@ -2,7 +2,10 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Mail, Lock, EyeOff, Eye } from "lucide-react";
 
-const API_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
+const API_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://127.0.0.1:8000';
+
+// Debug: Log API URL
+console.log('Auth.jsx - API URL:', API_URL);
 
 export default function Auth() {
   const location = useLocation();
@@ -34,6 +37,11 @@ export default function Auth() {
         return;
       }
 
+      if (cleanPassword.length > 50) {
+        alert("Password too long (max ~50 characters)");
+        return;
+      }
+
       console.log("Signup payload:", {
         email: cleanEmail,
         passwordLength: cleanPassword.length
@@ -48,15 +56,25 @@ export default function Auth() {
         })
       });
 
-      const data = await res.json();
-      console.log("Signup response:", data);
+      let data = {};
+      try {
+        data = await res.json();
+        console.log("Signup response:", data);
+      } catch (e) {
+        console.error("Invalid JSON in signup response:", e);
+        throw new Error("Invalid response from server");
+      }
 
-      if (!res.ok || !data.success) {
+      if (!res.ok) {
+        throw new Error(data?.detail || `HTTP ${res.status}: ${res.statusText}`);
+      }
+      
+      if (!data.success) {
         throw new Error(
-        Array.isArray(data.detail)
-        ? data.detail[0].msg
-        : data.detail || "Something went wrong"
-        )
+          Array.isArray(data.detail)
+            ? data.detail[0].msg
+            : data.detail || "Signup failed"
+        );
       }
 
       localStorage.setItem("token", data.token);
@@ -77,6 +95,11 @@ export default function Auth() {
       const cleanEmail = email.trim();
       const cleanPassword = password.trim();
 
+      if (cleanPassword.length > 50) {
+        alert("Password too long (max ~50 characters)");
+        return;
+      }
+
       console.log("Login payload:", {
         email: cleanEmail,
         passwordLength: cleanPassword.length
@@ -91,10 +114,20 @@ export default function Auth() {
         })
       });
 
-      const data = await res.json();
-      console.log("Login response:", data);
+      let data = {};
+      try {
+        data = await res.json();
+        console.log("Login response:", data);
+      } catch (e) {
+        console.error("Invalid JSON in login response:", e);
+        throw new Error("Invalid response from server");
+      }
 
-      if (!res.ok || !data.success) {
+      if (!res.ok) {
+        throw new Error(data?.detail || `HTTP ${res.status}: ${res.statusText}`);
+      }
+      
+      if (!data.success) {
         throw new Error(data.detail || "Login failed");
       }
 

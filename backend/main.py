@@ -75,6 +75,15 @@ def startup():
     except Exception as e:
         print("❌ DB error:", e)
 
+# ------------------ HEALTH ------------------
+@app.get("/")
+def root():
+    return {"status": "running", "service": "StackMind Backend"}
+
+@app.get("/health")
+def health():
+    return {"status": "healthy", "timestamp": time.time()}
+
 # ------------------ TOKEN ------------------
 SECRET_KEY = os.getenv("SECRET_KEY", "super-secret-key")
 ALGORITHM = "HS256"
@@ -87,6 +96,10 @@ def create_token(data: dict):
 
 # ------------------ PASSWORD ------------------
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+MAX_BCRYPT_BYTES = 72
+
+def safe_password(password: str) -> str:
+    return password.encode("utf-8")[:72].decode("utf-8", errors="ignore")
 
 # ------------------ MODELS ------------------
 class IdeaRequest(BaseModel):
@@ -101,16 +114,6 @@ class UserAuth(BaseModel):
         if len(v.strip()) < 6:
             raise ValueError("Password must be at least 6 characters")
         return v
-
-# ------------------ ROOT ------------------
-@app.get("/")
-def root():
-    return {"status": "running"}
-
-# ------------------ HEALTH ------------------
-@app.get("/health")
-def health():
-    return {"status": "ok"}
 
 # ------------------ RECOMMEND ------------------
 @app.post("/recommend")
@@ -219,18 +222,16 @@ def get_stacks(db: Session = Depends(get_db)):
 def signup(auth: UserAuth, db: Session = Depends(get_db)):
     try:
         email = auth.email.strip().lower()
-        password = auth.password.strip()
-
-        # 🔥 IMPORTANT
-        password = password[:72]
+        
+        clean_password = safe_password(auth.password)
 
         existing = db.query(User).filter(User.email == email).first()
         if existing:
             raise HTTPException(400, "User already exists")
 
-        hashed = pwd_context.hash(password)
+        hashed_password = pwd_context.hash(clean_password)
 
-        user = User(email=email, password=hashed)
+        user = User(email=email, password=hashed_password)
         db.add(user)
         db.commit()
         db.refresh(user)
@@ -243,21 +244,30 @@ def signup(auth: UserAuth, db: Session = Depends(get_db)):
             "user": {"id": user.id, "email": user.email}
         }
 
+    except HTTPException:
+        # Re-raise HTTP exceptions (like our password validation)
+        raise
     except Exception as e:
-        print("Signup error:", e)
-        raise HTTPException(500, str(e))
+        import traceback
+        print("Signup error:", str(e))
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 # ------------------ LOGIN ------------------
 @app.post("/auth/login")
 def login(auth: UserAuth, db: Session = Depends(get_db)):
     try:
         email = auth.email.strip().lower()
-        password = auth.password.strip()[:72]
-
+        
         user = db.query(User).filter(User.email == email).first()
 
-        if not user or not pwd_context.verify(password, user.password):
-            raise HTTPException(401, "Invalid email or password")
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+
+        clean_password = safe_password(auth.password)
+
+        if not pwd_context.verify(clean_password, user.password):
+            raise HTTPException(status_code=401, detail="Invalid email or password")
 
         token = create_token({"sub": user.email})
 
@@ -267,9 +277,14 @@ def login(auth: UserAuth, db: Session = Depends(get_db)):
             "user": {"id": user.id, "email": user.email}
         }
 
+    except HTTPException:
+        # Re-raise HTTP exceptions (like our password validation)
+        raise
     except Exception as e:
-        print("Login error:", e)
-        raise HTTPException(500, str(e))
+        import traceback
+        print("Login error:", str(e))
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 # ------------------ SHARE ------------------
 @app.post("/share")

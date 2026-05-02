@@ -4,7 +4,10 @@ import { ArrowLeft, Server, Layers, Cloud, CheckCircle2, AlertCircle, Loader2 } 
 import InputBox from "../components/InputBox";
 
 // 🌐 API Configuration
-const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+const API_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || "http://127.0.0.1:8000";
+
+// Debug: Log API URL
+if (import.meta.env.DEV) console.log('Share.jsx - API URL:', API_URL);
 
 // Read-only wrapper for InputBox
 export default function SharePage() {
@@ -25,8 +28,15 @@ export default function SharePage() {
           throw new Error("Failed to load shared stack");
         }
 
-        const data = await res.json();
-        setResult(data.data);
+        let data;
+        try {
+          data = await res.json();
+          if (import.meta.env.DEV) console.log('Share response:', data);
+          setResult(data.data);
+        } catch (e) {
+          console.error('Invalid JSON in share response:', e);
+          throw new Error('Invalid response from server');
+        }
       } catch (err) {
         if (import.meta.env.DEV) console.error("Error fetching shared stack:", err);
         setError(err.message);
