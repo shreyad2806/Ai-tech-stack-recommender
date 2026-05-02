@@ -179,7 +179,40 @@ def save_stack(data: dict, db: Session = Depends(get_db)):
 # ------------------ GET STACKS ------------------
 @app.get("/stacks")
 def get_stacks(db: Session = Depends(get_db)):
-    return db.query(Stack).all()
+    """Get all stacks. Always returns an array (empty if error)."""
+    try:
+        if db is None:
+            print("⚠️ DB not available, returning empty array")
+            return []
+        
+        stacks = db.query(Stack).all()
+        
+        # ✅ Ensure always returns array
+        if stacks is None:
+            return []
+        
+        # ✅ Convert to list of dicts with safe field access
+        result = []
+        for s in stacks:
+            result.append({
+                "id": s.id if hasattr(s, 'id') else None,
+                "idea": s.idea if hasattr(s, 'idea') else "",
+                "architecture": s.architecture if hasattr(s, 'architecture') else "",
+                "core_technologies": s.core_technologies if hasattr(s, 'core_technologies') else [],
+                "deployment": s.deployment if hasattr(s, 'deployment') else "",
+                "roadmap": s.roadmap if hasattr(s, 'roadmap') else [],
+                "created_at": str(s.created_at) if hasattr(s, 'created_at') and s.created_at else None
+            })
+        
+        print(f"✅ Returning {len(result)} stacks")
+        return result
+        
+    except Exception as e:
+        print(f"❌ Error fetching stacks: {e}")
+        import traceback
+        traceback.print_exc()
+        # ✅ Always return empty array on error (never null)
+        return []
 
 # ------------------ SIGNUP ------------------
 @app.post("/auth/signup")
@@ -253,4 +286,3 @@ def get_share(id: str, db: Session = Depends(get_db)):
     if not share:
         raise HTTPException(404, "Not found")
     return share
-        

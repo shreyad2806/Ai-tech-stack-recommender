@@ -12,11 +12,18 @@ export default function Sidebar() {
     fetch(`${API_URL}/stacks`)
       .then((res) => res.json())
       .then((data) => {
-        if (import.meta.env.DEV) console.log("History loaded:", data);
-        setHistory(data);
+        // ✅ FIX: Ensure data is always an array
+        if (Array.isArray(data)) {
+          if (import.meta.env.DEV) console.log("History loaded:", data);
+          setHistory(data);
+        } else {
+          console.error("Invalid response: expected array, got:", typeof data);
+          setHistory([]); // Fallback to empty array
+        }
       })
       .catch((err) => {
         if (import.meta.env.DEV) console.error("History error:", err);
+        setHistory([]); // ✅ Ensure array on error
       });
   }, []);
 
@@ -56,7 +63,8 @@ export default function Sidebar() {
         <p className="mb-3 text-xs text-gray-500">HISTORY</p>
 
         <div className="space-y-2">
-          {history.length === 0 ? (
+          {/* ✅ FIX: Double check it's an array before mapping */}
+          {!Array.isArray(history) || history.length === 0 ? (
             <p className="text-xs text-gray-500">No history yet</p>
           ) : (
             history.map((item) => (

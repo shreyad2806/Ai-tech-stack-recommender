@@ -40,7 +40,8 @@ export default function ExampleCards() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {examples.map((example) => (
+        {/* ✅ FIX: Safety check before mapping */}
+        {Array.isArray(examples) && examples.map((example) => (
           <div 
             key={example.id}
             className="group relative bg-[#14141f]/80 backdrop-blur-xl border border-white/10 rounded-xl p-5 hover:-translate-y-1.5 hover:shadow-[0_15px_30px_rgba(0,0,0,0.4)] hover:border-white/20 hover:bg-[#14141f] transition-all duration-300 cursor-pointer flex flex-col"
@@ -59,7 +60,8 @@ export default function ExampleCards() {
             </p>
 
             <div className="flex flex-wrap items-center gap-2 mt-auto">
-              {example.tags.map((tag) => (
+              {/* ✅ FIX: Safety check for nested tags */}
+              {Array.isArray(example.tags) && example.tags.map((tag) => (
                 <span key={tag} className="px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-[11px] font-bold text-gray-500 group-hover:text-gray-300 transition-colors">
                   {tag}
                 </span>

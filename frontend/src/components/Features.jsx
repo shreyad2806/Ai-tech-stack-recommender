@@ -36,7 +36,8 @@ export default function Features() {
       </h2>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
-        {features.map((feature, idx) => {
+        {/* ✅ FIX: Safety check before mapping */}
+        {Array.isArray(features) && features.map((feature, idx) => {
           const Icon = feature.icon;
           return (
             <div 
@@ -60,7 +61,8 @@ export default function Features() {
 
               {/* Pill Tags */}
               <div className="flex flex-wrap items-center gap-2 mt-auto z-10">
-                {feature.tags.map((tag, i) => (
+                {/* ✅ FIX: Safety check for nested tags */}
+                {Array.isArray(feature.tags) && feature.tags.map((tag, i) => (
                   <span 
                     key={i} 
                     className="px-3 py-1 bg-white/3 border border-white/10 rounded-md text-xs font-medium text-gray-400/80 group-hover:text-gray-300 group-hover:border-white/20 transition-colors"
