@@ -1,260 +1,148 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-
-// ✅ FIXED IMPORT (make sure file name matches exactly)
 import Sidebar from "../components/Sidebar";
 import InputBox from "../components/InputBox";
+import ResultView from "../components/ResultView";
 
-import { Share, Bell, Settings, LogOut, Eraser, Loader2 } from "lucide-react";
+// 🌐 API URL
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 export default function Dashboard() {
-  const navigate = useNavigate();
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [user, setUser] = useState(null);
-  const [result, setResult] = useState(null);
   const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [authChecked, setAuthChecked] = useState(false);
+  const [result, setResult] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Debug: Log current state
-  console.log("STATE:", { authChecked, isLoading });
-
-  // Debug: Verify token exists
-  console.log("TOKEN:", localStorage.getItem("token"));
-
-  if (import.meta.env.DEV) console.log("Dashboard: Rendering", { user, isLoading, authChecked });
-
-  // Auth check on mount
+  // 🔄 Load history on mount
   useEffect(() => {
-    console.log("🔍 Dashboard mounted");
+    try {
+      const stored = JSON.parse(localStorage.getItem("history") || "[]");
+      setHistory(Array.isArray(stored) ? stored : []);
+      console.log("📚 History loaded:", stored);
+    } catch (err) {
+      console.error("❌ History load error:", err);
+      setHistory([]);
+    }
+  }, []);
 
-    const token = localStorage.getItem("token");
-    console.log("🔑 Token:", token);
+  // 🆕 New chat
+  const handleNewChat = () => {
+    console.log("🆕 New chat started");
+    setInput("");
+    setResult(null);
+    setIsLoading(false);
+  };
 
-    if (!token) {
-      console.log("❌ No token → redirect");
-      navigate("/auth");
+  // 🚀 Generate (API CALL)
+  const handleGenerate = async () => {
+    if (!input.trim()) {
+      console.log("⚠️ Empty input, skipping generation");
       return;
     }
 
+    console.log("🚀 Starting generation for:", input);
+    setIsLoading(true);
+    setResult({ loading: true });
+
     try {
-      const rawUser = localStorage.getItem("user");
-      if (rawUser) {
-        setUser(JSON.parse(rawUser));
-      }
-    } catch {
-      setUser(null);
-    }
+      const res = await fetch(`${API_URL}/recommend`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ idea: input.trim() }),
+      });
 
-    // ✅ IMPORTANT: delay to allow render cycle
-    setTimeout(() => {
-      setAuthChecked(true);
-      setIsLoading(false);
-      console.log("✅ Auth state updated");
-    }, 100);
+      console.log("📡 API response status:", res.status);
 
-  }, []);
-
-  // ✅ Restore state on mount (runs immediately)
-  useEffect(() => {
-    try {
-      const savedStack = localStorage.getItem("lastStack");
-      const savedIdea = localStorage.getItem("lastIdea");
-
-      if (savedStack) {
-        setResult(JSON.parse(savedStack));
-      }
-
-      if (savedIdea) {
-        setInput(savedIdea);
-      }
-    } catch (err) {
-      console.error("Restore failed:", err);
-    }
-  }, []);
-
-  // Load saved data (after auth check)
-  useEffect(() => {
-    if (!authChecked) return;
-
-    if (import.meta.env.DEV) console.log("Dashboard: Loading saved data...");
-
-    const saved = localStorage.getItem("lastStack");
-    if (saved) {
+      let data = {};
       try {
-        const parsed = JSON.parse(saved);
-        setResult(parsed);
-        if (import.meta.env.DEV) console.log("Dashboard: Restored stack from localStorage:", parsed);
-      } catch (e) {
-        if (import.meta.env.DEV) console.error("Dashboard: Failed to load saved stack", e);
+        const text = await res.text();
+        console.log("📄 Raw response:", text);
+        data = JSON.parse(text);
+      } catch (parseErr) {
+        console.error("❌ JSON parse error:", parseErr);
+        throw new Error("Invalid JSON response from server");
       }
-    }
 
-    const savedIdea = localStorage.getItem("lastIdea");
-    if (savedIdea) {
-      setInput(savedIdea);
-      if (import.meta.env.DEV) console.log("Dashboard: Restored idea from localStorage:", savedIdea);
-    }
-  }, [authChecked]);
+      if (!res.ok) {
+        console.error("❌ API error:", data);
+        throw new Error(data?.error || data?.detail || `HTTP ${res.status}`);
+      }
 
-  // Dynamic greeting function
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-    return "Good evening";
+      console.log("✅ API success:", data);
+      
+      // ✅ Set result
+      setResult(data);
+      setIsLoading(false);
+
+      // 💾 Save to history
+      const updatedHistory = [
+        { idea: input, result: data, timestamp: Date.now() },
+        ...history,
+      ].slice(0, 10);
+
+      localStorage.setItem("history", JSON.stringify(updatedHistory));
+      setHistory(updatedHistory);
+      console.log("💾 History updated:", updatedHistory);
+
+    } catch (err) {
+      console.error("❌ Generate error:", err);
+      setResult({ error: err.message });
+      setIsLoading(false);
+    }
   };
 
-  // Click outside handler for dropdown
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (isDropdownOpen && !event.target.closest('.user-dropdown')) {
-        setIsDropdownOpen(false);
-      }
-    };
+  // 🔄 Handle history item click
+  const handleHistoryClick = (item) => {
+    console.log("📖 Loading history item:", item.idea);
+    setInput(item.idea);
+    setResult(item.result);
+  };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isDropdownOpen]);
-
-  // Loading UI
-  if (!authChecked || isLoading) {
-    return (
-      <div className="min-h-screen w-full bg-[#050508] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin w-8 h-8 border-2 border-green-400 border-t-transparent rounded-full"></div>
-          <p className="text-gray-400">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // If no user after auth check, show error or redirect
-  if (!user) {
-    if (import.meta.env.DEV) console.log("Dashboard: No user found after auth check");
-    return (
-      <div className="min-h-screen w-full bg-[#050508] flex items-center justify-center">
-        <div className="bg-[#111827] border border-red-800 rounded-xl p-8 max-w-md text-center">
-          <h2 className="text-xl font-bold text-white mb-4">Authentication Required</h2>
-          <p className="text-gray-400 mb-6">Please log in to access the dashboard.</p>
-          <button
-            onClick={() => navigate("/auth")}
-            className="px-6 py-3 bg-[#6ef0c0] text-black font-bold rounded-xl hover:bg-[#5dd0a8] transition-colors"
-          >
-            Go to Login
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (import.meta.env.DEV) console.log("Dashboard: Rendering main content", { userEmail: user?.email });
+  console.log("🎯 Current state:", { input: input.substring(0, 50), result, isLoading, historyLength: history.length });
 
   return (
-    <div className="min-h-screen w-full bg-[#050508] flex font-sans overflow-hidden">
-      
-      {/* Sidebar */}
-      <Sidebar 
-        onNewChat={() => {
-          setResult(null);
-          setInput("");
-          localStorage.removeItem("lastStack");
-          localStorage.removeItem("lastIdea");
-          localStorage.removeItem("history");
-        }}
-        setResult={setResult}
-        setInput={setInput}
+    <div className="flex h-screen bg-[#050508] text-white">
+
+      <Sidebar
+        history={history}
+        onNewChat={handleNewChat}
+        onHistoryClick={handleHistoryClick}
       />
 
-      {/* Main */}
-      <main className="relative flex flex-col flex-1 h-screen overflow-y-auto">
+      {/* Main Section */}
+      <div className="flex-1 flex flex-col">
 
-        {/* Header */}
-        <header className="flex justify-end w-full gap-3 px-6 py-4 border-b border-white/5">
-
-          <button className="flex items-center gap-2 px-4 py-2 text-gray-400 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
-            <Share className="w-4 h-4" />
+        {/* Navbar */}
+        <div className="flex justify-end items-center p-4 border-b border-gray-800">
+          <button className="px-4 py-2 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors">
             Share
           </button>
 
-          <button className="flex items-center justify-center w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 transition-colors">
-            <Bell className="w-4 h-4" />
-          </button>
-
-          <div className="relative user-dropdown">
-            <button 
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-600/20 hover:bg-purple-600/30 transition-colors"
-            >
-              <span className="text-sm font-bold text-purple-200">
-                {user?.email?.[0]?.toUpperCase() || "U"}
-              </span>
-            </button>
-
-            {isDropdownOpen && (
-              <div className="absolute right-0 mt-3 w-48 bg-[#151522] rounded-xl py-2 border border-white/10 shadow-xl z-50">
-                <div className="px-4 py-2 border-b border-white/5">
-                  <p className="text-white text-sm truncate">{user?.email || "user@example.com"}</p>
-                </div>
-                <button className="w-full px-4 py-2 text-left text-gray-300 hover:bg-white/5 transition-colors flex items-center gap-2">
-                  <Eraser className="w-4 h-4" />
-                  Clear chats
-                </button>
-                <button className="w-full px-4 py-2 text-left text-gray-300 hover:bg-white/5 transition-colors flex items-center gap-2">
-                  <Settings className="w-4 h-4" />
-                  Settings
-                </button>
-                <button 
-                  onClick={() => {
-                    localStorage.removeItem("token");
-                    localStorage.removeItem("user");
-                    navigate("/auth");
-                  }}
-                  className="w-full px-4 py-2 text-left text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-2"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Logout
-                </button>
-              </div>
-            )}
+          <div className="ml-3 w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center text-white font-semibold">
+            S
           </div>
-
-        </header>
+        </div>
 
         {/* Content */}
-        <div className="flex flex-col justify-center flex-1 p-8">
+        <div className="flex-1 overflow-y-auto p-6">
 
-          <div className="w-full max-w-4xl mx-auto">
+          {/* Input */}
+          <InputBox
+            input={input}
+            setInput={setInput}
+            onGenerate={handleGenerate}
+            loading={isLoading}
+          />
 
-            <p className="mb-2 text-gray-400">
-              {getGreeting()}
-            </p>
-
-            <h1 className="mb-4 text-5xl font-bold text-white leading-tight">
-              What are you <span className="bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent">building</span> today?
-            </h1>
-
-            <p className="text-gray-400 mt-2 max-w-2xl">
-              Describe your idea in plain language — StackMind will recommend your full tech stack, architecture, and deployment strategy in seconds.
-            </p>
-
-            {/* Debug: Show user data structure in development */}
-            {process.env.NODE_ENV === 'development' && (
-              <details className="mb-4 text-xs text-gray-500">
-                <summary>Debug user data</summary>
-                <pre className="mt-2 p-2 bg-[#0a0a0f] rounded overflow-auto max-h-32">
-                  {JSON.stringify(user, null, 2)}
-                </pre>
-              </details>
-            )}
-
-            <InputBox input={input} setInput={setInput} result={result} setResult={setResult} />
-
+          {/* Result */}
+          <div className="mt-8">
+            <ResultView data={result} />
           </div>
 
         </div>
 
-      </main>
+      </div>
     </div>
   );
 }

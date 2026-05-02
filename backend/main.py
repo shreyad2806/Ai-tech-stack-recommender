@@ -125,33 +125,149 @@ async def recommend(req: IdeaRequest):
             raise HTTPException(400, "Idea required")
 
         if not model:
-            return {"architecture": "Gemini not configured"}
+            return {
+                "success": False,
+                "error": "AI model not configured"
+            }
 
-        prompt = f"""
-        Give tech stack for: {idea}
-        Return JSON with:
-        architecture, core_technologies, deployment, roadmap
-        """
+        prompt = f"""You are an expert system architect. Given this idea: {idea}
 
+Return ONLY valid JSON in this exact format. No text, no markdown, no explanation:
+
+{{
+  "idea": "{idea}",
+  "architecture": {{
+    "description": "Detailed system architecture description",
+    "layers": [
+      {{
+        "name": "Layer Name",
+        "components": ["Component 1", "Component 2"]
+      }}
+    ]
+  }},
+  "tech_stack": {{
+    "frontend": ["React", "TypeScript", "Tailwind"],
+    "backend": ["FastAPI", "Python", "PostgreSQL"],
+    "database": ["PostgreSQL", "Redis"],
+    "ai_ml": ["OpenAI API", "LangChain"],
+    "devops": ["Docker", "AWS", "GitHub Actions"]
+  }},
+  "deployment": "Deployment strategy and platform details",
+  "roadmap": [
+    "Step 1: Setup foundation",
+    "Step 2: Build core features",
+    "Step 3: Deploy and scale"
+  ]
+}}
+
+IMPORTANT: Return ONLY the JSON object. No ```json``` wrapper, no explanation."""
+
+        # Generate AI response
         resp = model.generate_content(prompt)
         raw = resp.text if hasattr(resp, "text") else str(resp)
+        
+        print("AI RAW RESPONSE:", raw)
 
+        # Clean AI response safely
+        parsed = {}
         try:
-            match = re.search(r"\{.*\}", raw, re.DOTALL)
-            parsed = json.loads(match.group(0)) if match else {}
-        except:
-            parsed = {}
+            # Try to extract JSON from response
+            json_match = re.search(r'\{.*\}', raw, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(0)
+                parsed = json.loads(json_str)
+                print("PARSED JSON:", parsed)
+            else:
+                # If no JSON found, create fallback response
+                parsed = {
+                    "idea": idea,
+                    "architecture": {
+                        "description": f"Architecture for {idea}",
+                        "layers": [
+                            {"name": "Frontend", "components": ["React", "TypeScript"]},
+                            {"name": "Backend", "components": ["FastAPI", "Python"]},
+                            {"name": "Database", "components": ["PostgreSQL"]},
+                            {"name": "AI/ML", "components": ["OpenAI API"]}
+                        ]
+                    },
+                    "tech_stack": {
+                        "frontend": ["React", "TypeScript", "Tailwind"],
+                        "backend": ["FastAPI", "Python"],
+                        "database": ["PostgreSQL", "Redis"],
+                        "ai_ml": ["OpenAI API", "LangChain"],
+                        "devops": ["Docker", "AWS", "GitHub Actions"]
+                    },
+                    "deployment": "Deploy on Vercel (frontend) and AWS (backend)",
+                    "roadmap": [
+                        "Step 1: Setup development environment",
+                        "Step 2: Build core features",
+                        "Step 3: Add authentication",
+                        "Step 4: Deploy and scale"
+                    ]
+                }
+        except Exception as e:
+            print(f"JSON parsing error: {e}")
+            # Fallback response on parsing error
+            parsed = {
+                "idea": idea,
+                "architecture": {
+                    "description": f"Architecture for {idea}",
+                    "layers": [
+                        {"name": "Frontend", "components": ["React"]},
+                        {"name": "Backend", "components": ["FastAPI"]},
+                        {"name": "Database", "components": ["PostgreSQL"]}
+                    ]
+                },
+                "tech_stack": {
+                    "frontend": ["React"],
+                    "backend": ["FastAPI"],
+                    "database": ["PostgreSQL"],
+                    "ai_ml": ["OpenAI API"],
+                    "devops": ["Docker"]
+                },
+                "deployment": "Deploy on cloud platform",
+                "roadmap": ["Setup", "Build", "Deploy"]
+            }
 
-        return {
-            "architecture": parsed.get("architecture", raw[:300]),
-            "core_technologies": parsed.get("core_technologies", []),
-            "deployment": parsed.get("deployment", ""),
-            "roadmap": parsed.get("roadmap", [])
+        # Return the parsed AI data directly
+        response = {
+            "idea": parsed.get("idea", idea),
+            "architecture": parsed.get("architecture", {
+                "description": f"Architecture for {idea}",
+                "layers": [
+                    {"name": "Frontend", "components": ["React", "TypeScript"]},
+                    {"name": "Backend", "components": ["FastAPI", "Python"]},
+                    {"name": "Database", "components": ["PostgreSQL"]},
+                    {"name": "AI/ML", "components": ["OpenAI API"]}
+                ]
+            }),
+            "tech_stack": parsed.get("tech_stack", {
+                "frontend": ["React", "TypeScript", "Tailwind"],
+                "backend": ["FastAPI", "Python"],
+                "database": ["PostgreSQL", "Redis"],
+                "ai_ml": ["OpenAI API", "LangChain"],
+                "devops": ["Docker", "AWS", "GitHub Actions"]
+            }),
+            "deployment": parsed.get("deployment", "Deploy on Vercel (frontend) and AWS (backend)"),
+            "roadmap": parsed.get("roadmap", [
+                "Step 1: Setup development environment",
+                "Step 2: Build core features",
+                "Step 3: Add authentication",
+                "Step 4: Deploy and scale"
+            ])
         }
+
+        print("FINAL RESPONSE:", response)
+        return response
 
     except Exception as e:
         print("Recommend error:", e)
-        raise HTTPException(500, str(e))
+        import traceback
+        traceback.print_exc()
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
 # ------------------ STREAM ------------------
 @app.post("/recommend-stream")
