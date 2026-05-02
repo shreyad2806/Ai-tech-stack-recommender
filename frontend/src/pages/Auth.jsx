@@ -77,6 +77,7 @@ export default function Auth() {
         );
       }
 
+      console.log("Saved token (signup):", data.token);
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
 
@@ -131,6 +132,7 @@ export default function Auth() {
         throw new Error(data.detail || "Login failed");
       }
 
+      console.log("Saved token (login):", data.token);
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
 

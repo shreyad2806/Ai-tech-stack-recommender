@@ -16,14 +16,14 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
 
-  // ✅ CRITICAL: Early loading guard - prevents white screen
-  if (!authChecked || isLoading) {
+  // Debug: Verify token exists
+  console.log("TOKEN:", localStorage.getItem("token"));
+
+  // Safe loading guard
+  if (!authChecked) {
     return (
-      <div className="min-h-screen w-full bg-[#050508] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 text-[#6ef0c0] animate-spin" />
-          <p className="text-gray-400">Loading dashboard...</p>
-        </div>
+      <div className="text-white p-10">
+        Checking authentication...
       </div>
     );
   }
@@ -32,11 +32,10 @@ export default function Dashboard() {
 
   // Auth check on mount
   useEffect(() => {
-    if (import.meta.env.DEV) console.log("Dashboard: Checking auth...");
+    console.log("Auth check running");
     const token = localStorage.getItem("token");
 
     if (!token) {
-      if (import.meta.env.DEV) console.log("Dashboard: No token found, redirecting to auth");
       navigate("/auth");
       return;
     }
@@ -44,16 +43,14 @@ export default function Dashboard() {
     const raw = localStorage.getItem("user") || "null";
     try {
       const parsedUser = JSON.parse(raw);
-      if (import.meta.env.DEV) console.log("Dashboard: User loaded:", parsedUser);
       setUser(parsedUser);
     } catch (error) {
-      if (import.meta.env.DEV) console.error("Dashboard: Error parsing user data:", error);
       setUser(null);
     }
     
     setAuthChecked(true);
     setIsLoading(false);
-  }, [navigate]);
+  }, []);
 
   // ✅ Restore state on mount (runs immediately)
   useEffect(() => {
