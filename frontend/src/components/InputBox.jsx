@@ -82,6 +82,23 @@ const safeParseResult = (result) => {
 
 // 🏷️ TECHNOLOGY TAGS - Step 5: Group technologies
 const categorizeTech = (tech) => {
+  if (!tech) return "other";
+
+  // if object → extract name
+  if (typeof tech === "object") {
+    tech = tech.name || tech.label || JSON.stringify(tech);
+  }
+
+  // if array → take first value
+  if (Array.isArray(tech)) {
+    tech = tech[0];
+  }
+
+  // final fallback
+  if (typeof tech !== "string") {
+    return "other";
+  }
+
   const tech_lower = tech.toLowerCase();
   
   // Frontend technologies
@@ -315,12 +332,12 @@ const DeploymentPlan = ({ deployment }) => {
 const TechnologyTags = ({ technologies }) => {
   if (!Array.isArray(technologies) || technologies.length === 0) return null;
   
-  const categorized = technologies.reduce((acc, tech) => {
+  const categorized = Array.isArray(technologies) ? technologies.reduce((acc, tech) => {
     const category = categorizeTech(tech);
     if (!acc[category]) acc[category] = [];
     acc[category].push(tech);
     return acc;
-  }, {});
+  }, {}) : {};
 
   const categoryOrder = ["frontend", "backend", "database", "ai", "devops", "other"];
   const categoryLabels = {
@@ -384,6 +401,12 @@ export default function InputBox({ input, setInput, result, setResult }) {
   const [error, setError] = useState("");
 
   // 🛡️ Safe result parsing
+  if (!result || typeof result !== "object") {
+    console.log("AI RESULT:", result);
+    return null;
+  }
+  
+  console.log("AI RESULT:", result);
   const safeResult = safeParseResult(result);
 
   // 🚀 GENERATE

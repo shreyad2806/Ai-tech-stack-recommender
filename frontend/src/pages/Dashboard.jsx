@@ -16,40 +16,43 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
 
+  // Debug: Log current state
+  console.log("STATE:", { authChecked, isLoading });
+
   // Debug: Verify token exists
   console.log("TOKEN:", localStorage.getItem("token"));
-
-  // Safe loading guard
-  if (!authChecked) {
-    return (
-      <div className="text-white p-10">
-        Checking authentication...
-      </div>
-    );
-  }
 
   if (import.meta.env.DEV) console.log("Dashboard: Rendering", { user, isLoading, authChecked });
 
   // Auth check on mount
   useEffect(() => {
-    console.log("Auth check running");
+    console.log("🔍 Dashboard mounted");
+
     const token = localStorage.getItem("token");
+    console.log("🔑 Token:", token);
 
     if (!token) {
+      console.log("❌ No token → redirect");
       navigate("/auth");
       return;
     }
 
-    const raw = localStorage.getItem("user") || "null";
     try {
-      const parsedUser = JSON.parse(raw);
-      setUser(parsedUser);
-    } catch (error) {
+      const rawUser = localStorage.getItem("user");
+      if (rawUser) {
+        setUser(JSON.parse(rawUser));
+      }
+    } catch {
       setUser(null);
     }
-    
-    setAuthChecked(true);
-    setIsLoading(false);
+
+    // ✅ IMPORTANT: delay to allow render cycle
+    setTimeout(() => {
+      setAuthChecked(true);
+      setIsLoading(false);
+      console.log("✅ Auth state updated");
+    }, 100);
+
   }, []);
 
   // ✅ Restore state on mount (runs immediately)
@@ -113,6 +116,18 @@ export default function Dashboard() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isDropdownOpen]);
+
+  // Loading UI
+  if (!authChecked || isLoading) {
+    return (
+      <div className="min-h-screen w-full bg-[#050508] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin w-8 h-8 border-2 border-green-400 border-t-transparent rounded-full"></div>
+          <p className="text-gray-400">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   // If no user after auth check, show error or redirect
   if (!user) {
