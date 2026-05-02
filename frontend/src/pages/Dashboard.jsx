@@ -16,6 +16,18 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
 
+  // ✅ CRITICAL: Early loading guard - prevents white screen
+  if (!authChecked || isLoading) {
+    return (
+      <div className="min-h-screen w-full bg-[#050508] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 text-[#6ef0c0] animate-spin" />
+          <p className="text-gray-400">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (import.meta.env.DEV) console.log("Dashboard: Rendering", { user, isLoading, authChecked });
 
   // Auth check on mount
@@ -87,19 +99,6 @@ export default function Dashboard() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isDropdownOpen]);
 
-  // Show loading state while checking auth
-  if (isLoading) {
-    if (import.meta.env.DEV) console.log("Dashboard: Showing loading state");
-    return (
-      <div className="min-h-screen w-full bg-[#050508] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 text-[#6ef0c0] animate-spin" />
-          <p className="text-gray-400">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
   // If no user after auth check, show error or redirect
   if (!user) {
     if (import.meta.env.DEV) console.log("Dashboard: No user found after auth check");
@@ -125,7 +124,12 @@ export default function Dashboard() {
     <div className="min-h-screen w-full bg-[#050508] flex font-sans overflow-hidden">
       
       {/* Sidebar */}
-      <Sidebar />
+      <Sidebar onNewChat={() => {
+        setResult(null);
+        setInput("");
+        localStorage.removeItem("lastStack");
+        localStorage.removeItem("lastIdea");
+      }} />
 
       {/* Main */}
       <main className="relative flex flex-col flex-1 h-screen overflow-y-auto">

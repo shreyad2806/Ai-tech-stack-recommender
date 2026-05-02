@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 // 🌐 API Configuration
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
-export default function Sidebar() {
+export default function Sidebar({ onNewChat }) {
   const [history, setHistory] = useState([]);
 
   // ✅ Fetch history from backend
@@ -47,10 +47,9 @@ export default function Sidebar() {
       {/* New Chat */}
       <button
         onClick={() => {
-          localStorage.removeItem("lastStack");
-          localStorage.removeItem("lastIdea");
-          if (import.meta.env.DEV) console.log("Cleared localStorage for new chat");
-          window.location.reload();
+          // ✅ FIX: Proper state reset without reload
+          if (onNewChat) onNewChat();
+          if (import.meta.env.DEV) console.log("New chat started");
         }}
         className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#6ef0c0] text-black font-semibold mb-6"
       >
