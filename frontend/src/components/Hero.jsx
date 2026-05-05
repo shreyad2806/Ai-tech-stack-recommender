@@ -19,6 +19,14 @@ export default function Hero() {
         <br className="hidden md:block" /> in seconds with AI
       </h1>
 
+      {/* Badge */}
+      <div className="mb-6">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
+          <span className="text-emerald-400 text-sm">✨</span>
+          <span className="text-emerald-400 text-sm font-medium">No login required – try instantly</span>
+        </div>
+      </div>
+
       {/* Subtitle */}
       <p className="text-lg md:text-xl text-gray-400 max-w-2xl mb-12 leading-relaxed">
         Describe your software idea and get a complete architecture, tech stack,
@@ -28,10 +36,10 @@ export default function Hero() {
       {/* Buttons */}
       <div className="flex flex-col sm:flex-row items-center gap-4 mb-20">
         <button
-          onClick={() => navigate("/auth", { state: { mode: "login" } })}
+          onClick={() => navigate("/dashboard")}
           className="cursor-pointer px-8 py-3.5 text-[#09090f] bg-linear-to-r from-emerald-300 to-emerald-400 rounded-xl font-bold text-lg hover:brightness-110 transition-all shadow-[0_0_30px_rgba(52,211,153,0.3)]"
         >
-          Get Started — It's Free
+          Try Now — It's Free
         </button>
         <Link
           to="/demo"

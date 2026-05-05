@@ -1,215 +1,293 @@
-import { Loader2, AlertCircle, Server, Layers, Rocket, Target, Cloud } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  CheckCircle,
+  Layers,
+  Server,
+  Cloud,
+  Target,
+  Rocket,
+  Download,
+  Maximize2,
+  X,
+} from "lucide-react";
+import { useState } from "react";
 
-export default function ResultView({ data }) {
-  // 🔄 Loading state
-  if (data?.loading) {
+/* =========================
+   ICON + CATEGORY CONFIG
+========================= */
+const categoryIcons = {
+  frontend: Layers,
+  backend: Server,
+  database: Cloud,
+  ai_ml: Target,
+  devops: Rocket,
+};
+
+const categoryNames = {
+  frontend: "Frontend",
+  backend: "Backend",
+  database: "Database",
+  ai_ml: "AI / ML",
+  devops: "DevOps",
+};
+
+/* =========================
+   MAIN COMPONENT
+========================= */
+export default function ResultView({ data, isLoading }) {
+  /* ===== LOADING ===== */
+  if (isLoading) {
     return (
-      <div className="max-w-3xl mx-auto text-center py-12">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-12 h-12 text-cyan-400 animate-spin" />
+      <div className="w-full max-w-4xl mx-auto px-6 py-16 text-center">
+        <div className="flex flex-col items-center gap-6">
+          <div className="w-16 h-16 border-2 border-emerald-500/20 border-t-emerald-400 rounded-full animate-spin" />
           <div>
-            <h3 className="text-xl font-semibold text-white mb-2">AI is analyzing your idea...</h3>
-            <p className="text-gray-400">Designing architecture & selecting optimal tech stack</p>
+            <h3 className="text-xl font-semibold text-white mb-2">
+              AI is analyzing your idea...
+            </h3>
+            <p className="text-white/50">
+              Designing architecture & selecting optimal tech stack
+            </p>
           </div>
         </div>
       </div>
     );
   }
 
-  // ❌ Error state
+  /* ===== EMPTY STATES ===== */
+  if (!data || typeof data !== "object") return null;
+
   if (data?.error) {
     return (
-      <div className="max-w-3xl mx-auto">
-        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6">
-          <div className="flex items-center gap-3 text-red-400">
-            <AlertCircle className="w-5 h-5" />
-            <h3 className="font-semibold">Generation Failed</h3>
-          </div>
-          <p className="text-red-300 mt-2">{data.error}</p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="mt-4 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg transition-colors"
-          >
-            Try Again
-          </button>
-        </div>
+      <div className="text-red-400 text-center mt-10">
+        Error: {data.error}
       </div>
     );
   }
 
-  // 🧠 FALLBACK SAFETY - No data
-  if (!data || typeof data !== 'object') {
-    console.log("🛡️ ResultView: No valid data provided", data);
-    return null;
-  }
-
-  console.log("🎯 ResultView rendering data:", data);
-
-  // 🎨 Color configurations
-  const categoryColors = {
-    frontend: "from-blue-500/20 to-cyan-500/20 border-blue-500/30 text-blue-300",
-    backend: "from-green-500/20 to-emerald-500/20 border-green-500/30 text-green-300", 
-    database: "from-orange-500/20 to-amber-500/20 border-orange-500/30 text-orange-300",
-    ai_ml: "from-purple-500/20 to-pink-500/20 border-purple-500/30 text-purple-300",
-    devops: "from-red-500/20 to-rose-500/20 border-red-500/30 text-red-300",
-  };
-
-  const categoryIcons = {
-    frontend: Layers,
-    backend: Server,
-    database: Cloud,
-    ai_ml: Target,
-    devops: Rocket,
-  };
-
-  // 🏗️ Architecture Component
-  const ArchitectureCard = ({ architecture }) => {
-    if (!architecture) return null;
-
-    return (
-      <div className="bg-[#0f1b2d] rounded-xl border border-gray-800 p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <Server className="w-6 h-6 text-cyan-400" />
-          <h2 className="text-xl font-bold text-white">Architecture</h2>
-        </div>
-
-        {typeof architecture === "string" ? (
-          <p className="text-gray-300 leading-relaxed">{architecture}</p>
-        ) : architecture?.description ? (
-          <div className="space-y-4">
-            <p className="text-gray-300 leading-relaxed">{architecture.description}</p>
-            
-            {architecture.layers?.map((layer, i) => (
-              <div key={i} className="bg-[#050508] rounded-lg p-4 border border-gray-700">
-                <h4 className="font-semibold text-white mb-3">{layer.name}</h4>
-                <div className="flex flex-wrap gap-2">
-                  {Array.isArray(layer.components) && layer.components.map((component, j) => (
-                    <span
-                      key={j}
-                      className="px-3 py-1.5 bg-gray-700 text-gray-300 rounded-full text-sm border border-gray-600"
-                    >
-                      {component}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-gray-500 italic">No architecture details provided</p>
-        )}
-      </div>
-    );
-  };
-
-  // 🧰 Tech Stack Component
-  const TechStackCard = ({ tech_stack }) => {
-    if (!tech_stack || typeof tech_stack !== 'object') return null;
-
-    const entries = Object.entries(tech_stack).filter(([key, value]) => 
-      Array.isArray(value) && value.length > 0
-    );
-
-    if (entries.length === 0) return null;
-
-    return (
-      <div className="bg-[#0f1b2d] rounded-xl border border-gray-800 p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <Layers className="w-6 h-6 text-cyan-400" />
-          <h2 className="text-xl font-bold text-white">Tech Stack</h2>
-        </div>
-
-        <div className="space-y-6">
-          {entries.map(([category, technologies]) => {
-            const Icon = categoryIcons[category] || Layers;
-            const colorClass = categoryColors[category] || categoryColors.frontend;
-            
-            return (
-              <div key={category}>
-                <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                  <Icon className="w-4 h-4" />
-                  {category.replace('_', ' / ')}
-                </h4>
-                <div className="flex flex-wrap gap-2">
-                  {technologies.map((tech, i) => (
-                    <span
-                      key={i}
-                      className={`
-                        px-3 py-1.5 rounded-full text-sm font-medium
-                        bg-gradient-to-r ${colorClass}
-                        border hover:scale-105 transition-transform cursor-default
-                      `}
-                    >
-                      {tech}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  // 🚀 Deployment Component
-  const DeploymentCard = ({ deployment }) => {
-    if (!deployment) return null;
-
-    return (
-      <div className="bg-[#0f1b2d] rounded-xl border border-gray-800 p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <Cloud className="w-6 h-6 text-cyan-400" />
-          <h2 className="text-xl font-bold text-white">Deployment Strategy</h2>
-        </div>
-        <p className="text-gray-300 leading-relaxed">{deployment}</p>
-      </div>
-    );
-  };
-
-  // 🗺️ Roadmap Component
-  const RoadmapCard = ({ roadmap }) => {
-    if (!roadmap || !Array.isArray(roadmap) || roadmap.length === 0) return null;
-
-    return (
-      <div className="bg-[#0f1b2d] rounded-xl border border-gray-800 p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <Target className="w-6 h-6 text-cyan-400" />
-          <h2 className="text-xl font-bold text-white">Implementation Roadmap</h2>
-        </div>
-
-        <div className="space-y-4">
-          {roadmap.map((step, index) => (
-            <div key={index} className="flex gap-4">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 flex items-center justify-center text-sm font-semibold text-cyan-300 flex-shrink-0">
-                {index + 1}
-              </div>
-              <p className="text-gray-300 leading-relaxed">{step}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+  /* ===== SAFE DATA ===== */
+  const safeData = {
+    tech_stack: data?.tech_stack || {},
+    architecture: data?.architecture || {},
+    deployment: data?.deployment || "",
+    roadmap: data?.roadmap || [],
+    cost: data?.cost || null,
+    reasoning: data?.reasoning || null,
+    idea: data?.idea || "Your project",
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Success Header */}
-      {data && !data.loading && !data.error && (
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-full text-green-400 mb-4">
-            <span className="w-2 h-2 bg-green-400 rounded-full"></span>
-            Tech Stack Generated Successfully
-          </div>
-          <h2 className="text-2xl font-bold text-white">Your Architecture is Ready</h2>
+    <div className="w-full max-w-5xl mx-auto px-6 space-y-6">
+
+      {/* SUCCESS BADGE */}
+      <div className="flex justify-center">
+        <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm">
+          <CheckCircle className="w-4 h-4" />
+          Tech Stack Generated
         </div>
+      </div>
+
+      
+      {/* TECH STACK */}
+      <TechStackCard techStack={safeData?.tech_stack} />
+
+      {/* COST ESTIMATE */}
+      {safeData?.cost && (
+        <CostCard cost={safeData?.cost} />
       )}
 
-      {/* Render all components */}
-      <ArchitectureCard architecture={data?.architecture} />
-      <TechStackCard tech_stack={data?.tech_stack} />
-      <DeploymentCard deployment={data?.deployment} />
-      <RoadmapCard roadmap={data?.roadmap} />
+      {/* REASONING */}
+      {safeData?.reasoning && (
+        <ReasoningCard reasoning={safeData?.reasoning} />
+      )}
+
+      {/* DEPLOYMENT */}
+      <DeploymentCard deployment={safeData?.deployment} />
+
+      {/* ROADMAP */}
+      <RoadmapCard roadmap={safeData?.roadmap} />
+    </div>
+  );
+}
+
+
+/* =========================
+   TECH STACK
+========================= */
+function TechStackCard({ techStack }) {
+  console.log("TECHSTACK CARD - techStack:", techStack);
+  console.log("TECHSTACK CARD - entries:", Object.entries(techStack || {}));
+  
+  if (!techStack) return null;
+
+  const entries = Object.entries(techStack);
+
+  const normalize = (items) => {
+    if (!items) return [];
+
+    if (!Array.isArray(items)) items = [items];
+
+    return items.map((item) => {
+      if (typeof item === "string") return item;
+
+      if (typeof item === "object") {
+        return item.name || JSON.stringify(item);
+      }
+
+      return "Unknown";
+    });
+  };
+
+  return (
+    <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+      <h2 className="text-lg font-semibold text-white mb-5">
+        Tech Stack
+      </h2>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        {entries.map(([category, items]) => {
+          const Icon = categoryIcons?.[category] || Layers;
+          const name = categoryNames?.[category] || category;
+
+          const safeItems = normalize(items);
+
+          return (
+            <div
+              key={category}
+              className="bg-white/5 border border-white/10 rounded-xl p-4"
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <Icon className="w-4 h-4 text-emerald-400" />
+                <span className="text-sm text-white/80">{name}</span>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {safeItems.map((tech, i) => (
+                  <span
+                    key={i}
+                    className="px-3 py-1 text-xs rounded-full bg-emerald-500/10 border border-emerald-500/20"
+                  >
+                    {tech}
+                  </span>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* =========================
+   DEPLOYMENT
+========================= */
+function DeploymentCard({ deployment }) {
+  if (!deployment) return null;
+
+  return (
+    <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+      <h2 className="text-lg font-semibold text-white mb-3">
+        Deployment
+      </h2>
+      <p className="text-white/70">{deployment}</p>
+    </div>
+  );
+}
+
+/* =========================
+   COST ESTIMATE
+========================= */
+function CostCard({ cost }) {
+  return (
+    <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+      <h2 className="text-lg font-semibold text-white mb-3">
+        Cost Estimate
+      </h2>
+      
+      {cost ? (
+        typeof cost === 'string' ? (
+          <p className="text-white/70">{cost}</p>
+        ) : (
+          <div className="space-y-3">
+            {cost.estimate && (
+              <p className="text-white/70 font-medium">{cost.estimate}</p>
+            )}
+            {cost.breakdown && cost.breakdown.length > 0 && (
+              <ul className="mt-2 text-sm text-gray-400 space-y-1">
+                {cost.breakdown.map((item, i) => (
+                  <li key={i}>• {item}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )
+      ) : (
+        <div className="text-center py-4 border-2 border-dashed border-white/20 rounded-xl">
+          <div className="text-gray-400 text-sm">
+            Cost estimate not available
+          </div>
+          <div className="text-gray-500 text-xs mt-1">
+            Check backend response for cost data
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* =========================
+   REASONING
+========================= */
+function ReasoningCard({ reasoning }) {
+  if (!reasoning) return null;
+
+  return (
+    <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+      <h2 className="text-lg font-semibold text-white mb-3">
+        Why This Stack?
+      </h2>
+      
+      {Array.isArray(reasoning) ? (
+        <div className="space-y-2">
+          {reasoning.map((point, i) => (
+            <div key={i} className="flex gap-3">
+              <div className="w-2 h-2 bg-emerald-400 rounded-full mt-2 flex-shrink-0"></div>
+              <p className="text-white/70">
+                {typeof point === "string" ? point : point?.text || JSON.stringify(point)}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-white/70">{reasoning}</p>
+      )}
+    </div>
+  );
+}
+
+/* =========================
+   ROADMAP
+========================= */
+function RoadmapCard({ roadmap }) {
+  if (!roadmap || roadmap.length === 0) return null;
+
+  return (
+    <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+      <h2 className="text-lg font-semibold text-white mb-4">
+        Roadmap
+      </h2>
+
+      <div className="space-y-3">
+        {roadmap.map((step, i) => (
+          <div key={i} className="flex gap-3">
+            <div className="w-6 h-6 bg-emerald-500 rounded-full text-xs flex items-center justify-center text-white">
+              {i + 1}
+            </div>
+            <p className="text-white/80">{step}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

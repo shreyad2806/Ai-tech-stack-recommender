@@ -26,15 +26,8 @@ export default function Header() {
           </nav>
 
           <div className="flex items-center gap-4">
-            <Link 
-              to="/auth" 
-              state={{ mode: "login" }}
-              className="cursor-pointer border border-white/20 rounded-lg px-4 py-2 text-sm font-medium hover:bg-white/10 transition-colors"
-            >
-              Login
-            </Link>
             <button
-              onClick={() => navigate("/auth", { state: { mode: "signup" } })}
+              onClick={() => navigate("/dashboard")}
               className="cursor-pointer bg-linear-to-r from-[#6ef0c0] to-[#8b8bff] text-black rounded-lg px-4 py-2 text-sm font-bold transition-opacity hover:opacity-90"
             >
               Try Now

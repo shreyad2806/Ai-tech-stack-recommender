@@ -9,63 +9,49 @@ export default function InputBox({ input, setInput, onGenerate, loading }) {
   };
 
   return (
-    <div className="max-w-3xl mx-auto text-center">
+    <div className="w-full max-w-2xl mx-auto">
       
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-8 text-center">
         <h1 className="text-4xl font-bold text-white mb-3">
-          What are you <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-400">building</span> today?
+          What are you <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-400 to-purple-500">building</span> today?
         </h1>
         <p className="text-gray-400 text-lg">
           Describe your idea and let AI design your perfect tech stack
         </p>
       </div>
 
-      {/* Input Container */}
-      <div className="bg-[#0f1b2d] rounded-2xl border border-gray-800 p-6 shadow-xl">
+      {/* Modern AI Input */}
+      <div className="bg-[#111827] border border-white/10 rounded-2xl p-4 shadow-lg backdrop-blur">
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="e.g., A real-time collaboration tool for remote teams with AI-powered suggestions..."
-          className="w-full h-32 bg-[#050508] rounded-xl p-4 text-gray-100 outline-none resize-none border border-gray-700 focus:border-cyan-500/50 transition-colors placeholder-gray-500"
+          placeholder="Describe your idea in detail..."
+          className="w-full bg-transparent text-gray-200 outline-none resize-none h-28 placeholder-gray-500"
           disabled={loading}
         />
 
-        {/* Character count */}
-        <div className="flex justify-between items-center mt-4">
-          <span className="text-gray-500 text-sm">
+        <div className="flex justify-between items-center mt-3">
+          <p className="text-xs text-gray-500">
             {input.length}/500 characters
-          </span>
-          <span className="text-gray-500 text-sm">
-            ⌘ + Enter to generate
-          </span>
-        </div>
+          </p>
 
-        {/* Generate Button */}
-        <button
-          onClick={onGenerate}
-          disabled={loading || !input.trim()}
-          className="
-            w-full mt-4 flex items-center justify-center gap-2 px-6 py-3 
-            bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600
-            text-white font-semibold rounded-xl transition-all
-            disabled:opacity-50 disabled:cursor-not-allowed
-            shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/30
-          "
-        >
-          {loading ? (
-            <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              Generating Tech Stack...
-            </>
-          ) : (
-            <>
-              <Rocket className="w-5 h-5" />
-              Generate Tech Stack
-            </>
-          )}
-        </button>
+          <button
+            onClick={onGenerate}
+            disabled={loading || !input.trim()}
+            className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
+                Generating...
+              </>
+            ) : (
+              "Generate"
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Quick Tags */}
@@ -80,9 +66,9 @@ export default function InputBox({ input, setInput, onGenerate, loading }) {
             disabled={loading}
             className="
               px-3 py-1.5 text-sm rounded-full
-              bg-gray-800 hover:bg-gray-700 text-gray-300
-              border border-gray-700 hover:border-gray-600
-              transition-all disabled:opacity-50
+              bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white
+              border border-white/10 hover:border-white/20
+              transition-all duration-200 disabled:opacity-50
             "
           >
             {tag}
