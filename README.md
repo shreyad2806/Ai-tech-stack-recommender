@@ -1,11 +1,11 @@
 # 🚀 AI Tech Stack Recommender
 
-An intelligent web application that transforms raw project ideas into complete, production-ready technology stack recommendations using Google's Gemini AI.
+An intelligent web application that transforms raw project ideas into complete, production-ready technology stack recommendations using a Groq OpenAI-compatible API.
 
 ![Tech Stack Recommender](https://img.shields.io/badge/AI-Powered-blue)
 ![React](https://img.shields.io/badge/React-Frontend-61DAFB)
 ![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688)
-![Gemini](https://img.shields.io/badge/Gemini-AI%20Model-4285F4)
+![Groq](https://img.shields.io/badge/Groq-OpenAI-compatible-brightgreen)
 
 ## ✨ Features
 
@@ -25,7 +25,7 @@ An intelligent web application that transforms raw project ideas into complete, 
 
 ### 🛡️ Fault-Tolerant Backend
 - **AI-First Processing**: Prioritizes AI-generated content, fallback only as last resort
-- **Retry Logic**: Automatic retry for Gemini API calls
+- **Retry Logic**: Automatic retry for AI API calls
 - **Safe JSON Parsing**: Handles malformed responses gracefully
 - **Smart Caching**: Redis and in-memory caching for performance
 - **Error Handling**: Never crashes, always returns valid JSON
@@ -43,10 +43,10 @@ An intelligent web application that transforms raw project ideas into complete, 
 - **SQLAlchemy** - Database ORM
 - **PostgreSQL** - Production database
 - **Redis** - Caching layer
-- **Google Generative AI (Gemini)** - LLM integration
+- **Groq (OpenAI-compatible)** - LLM integration
 
 ### AI/ML
-- **Gemini 2.5 Flash** - Primary LLM model
+- **llama-3.1-8b-instant (Groq)** - Primary LLM model
 - **Prompt Engineering** - Structured, context-aware prompts
 - **JSON Normalization** - Reliable response parsing
 
@@ -64,7 +64,7 @@ An intelligent web application that transforms raw project ideas into complete, 
 - Node.js 18+
 - PostgreSQL (optional, SQLite works for dev)
 - Redis (optional, in-memory cache works for dev)
-- Google Gemini API Key
+- GROQ API Key
 
 ### Backend Setup
 
@@ -89,8 +89,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # Create .env file
-echo GEMINI_API_KEY=your_api_key_here > .env
-echo GEMINI_MODEL=gemini-2.5-flash >> .env
+echo GROQ_API_KEY=your_groq_api_key > .env
 
 # Run the server
 uvicorn main:app --reload
@@ -118,8 +117,7 @@ Frontend runs at `http://localhost:5173`
 Create a `.env` file in the `backend` directory:
 
 ```env
-GEMINI_API_KEY=your_google_gemini_api_key
-GEMINI_MODEL=gemini-2.5-flash
+GROQ_API_KEY=your_groq_api_key
 DATABASE_URL=postgresql://user:password@localhost:5432/techstackdb  # Optional
 REDIS_URL=redis://localhost:6379  # Optional
 ```
@@ -202,7 +200,7 @@ This project is licensed under the MIT License.
 
 ## 🙏 Acknowledgments
 
-- Google Gemini API for powering the AI recommendations
+- Groq OpenAI-compatible API for powering the AI recommendations
 - React and FastAPI communities for excellent documentation
 - Open source contributors
 
