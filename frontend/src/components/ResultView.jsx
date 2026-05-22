@@ -1,293 +1,338 @@
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  CheckCircle,
-  Layers,
-  Server,
-  Cloud,
-  Target,
-  Rocket,
-  Download,
-  Maximize2,
-  X,
-} from "lucide-react";
 import { useState } from "react";
 
-/* =========================
-   ICON + CATEGORY CONFIG
-========================= */
+import {
+  Monitor,
+  Server,
+  Database,
+  Brain,
+  Rocket,
+  Layers,
+} from "lucide-react";
+
+import BuildModes from "./buildmodes";
+import ArchitectureCanvas from "./ArchitectureCanvas";
+import WorkflowInfographic from "./WorkflowInfographic";
+
 const categoryIcons = {
-  frontend: Layers,
+  frontend: Monitor,
   backend: Server,
-  database: Cloud,
-  ai_ml: Target,
+  database: Database,
+  ai: Brain,
+  ai_ml: Brain,
   devops: Rocket,
+  storage: Layers,
 };
 
 const categoryNames = {
   frontend: "Frontend",
   backend: "Backend",
   database: "Database",
+  ai: "AI / ML",
   ai_ml: "AI / ML",
   devops: "DevOps",
+  storage: "Storage",
 };
 
-/* =========================
-   MAIN COMPONENT
-========================= */
-export default function ResultView({ data, isLoading }) {
-  /* ===== LOADING ===== */
-  if (isLoading) {
-    return (
-      <div className="w-full max-w-4xl mx-auto px-6 py-16 text-center">
-        <div className="flex flex-col items-center gap-6">
-          <div className="w-16 h-16 border-2 border-emerald-500/20 border-t-emerald-400 rounded-full animate-spin" />
-          <div>
-            <h3 className="text-xl font-semibold text-white mb-2">
-              AI is analyzing your idea...
-            </h3>
-            <p className="text-white/50">
-              Designing architecture & selecting optimal tech stack
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+export default function ResultView({ data }) {
+  const [activeTab, setActiveTab] = useState("tech");
 
-  /* ===== EMPTY STATES ===== */
-  if (!data || typeof data !== "object") return null;
+  if (!data) return null;
 
-  if (data?.error) {
-    return (
-      <div className="text-red-400 text-center mt-10">
-        Error: {data.error}
-      </div>
-    );
-  }
+  const safeData = data?.data || data || {};
 
-  /* ===== SAFE DATA ===== */
-  const safeData = {
-    tech_stack: data?.tech_stack || {},
-    architecture: data?.architecture || {},
-    deployment: data?.deployment || "",
-    roadmap: data?.roadmap || [],
-    cost: data?.cost || null,
-    reasoning: data?.reasoning || null,
-    idea: data?.idea || "Your project",
-  };
+  const normalizeArray = (arr = []) => {
+    if (!arr) return [];
 
-  return (
-    <div className="w-full max-w-5xl mx-auto px-6 space-y-6">
+    if (!Array.isArray(arr)) {
+      arr = [arr];
+    }
 
-      {/* SUCCESS BADGE */}
-      <div className="flex justify-center">
-        <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm">
-          <CheckCircle className="w-4 h-4" />
-          Tech Stack Generated
-        </div>
-      </div>
-
-      
-      {/* TECH STACK */}
-      <TechStackCard techStack={safeData?.tech_stack} />
-
-      {/* COST ESTIMATE */}
-      {safeData?.cost && (
-        <CostCard cost={safeData?.cost} />
-      )}
-
-      {/* REASONING */}
-      {safeData?.reasoning && (
-        <ReasoningCard reasoning={safeData?.reasoning} />
-      )}
-
-      {/* DEPLOYMENT */}
-      <DeploymentCard deployment={safeData?.deployment} />
-
-      {/* ROADMAP */}
-      <RoadmapCard roadmap={safeData?.roadmap} />
-    </div>
-  );
-}
-
-
-/* =========================
-   TECH STACK
-========================= */
-function TechStackCard({ techStack }) {
-  console.log("TECHSTACK CARD - techStack:", techStack);
-  console.log("TECHSTACK CARD - entries:", Object.entries(techStack || {}));
-  
-  if (!techStack) return null;
-
-  const entries = Object.entries(techStack);
-
-  const normalize = (items) => {
-    if (!items) return [];
-
-    if (!Array.isArray(items)) items = [items];
-
-    return items.map((item) => {
-      if (typeof item === "string") return item;
-
-      if (typeof item === "object") {
-        return item.name || JSON.stringify(item);
+    return arr.map((item) => {
+      if (typeof item === "string") {
+        return {
+          name: item,
+          purpose: "",
+        };
       }
 
-      return "Unknown";
+      if (typeof item === "object" && item !== null) {
+        return {
+          name: item.name || "Unknown",
+          purpose: item.purpose || "",
+        };
+      }
+
+      return {
+        name: "Unknown",
+        purpose: "",
+      };
     });
   };
 
+  const techStack = {
+    frontend: normalizeArray(
+      safeData.frontend ||
+        safeData.tech_stack?.frontend
+    ),
+
+    backend: normalizeArray(
+      safeData.backend ||
+        safeData.tech_stack?.backend
+    ),
+
+    database: normalizeArray(
+      safeData.database ||
+        safeData.tech_stack?.database
+    ),
+
+    ai: normalizeArray(
+      safeData.ai ||
+        safeData.ai_ml ||
+        safeData.tech_stack?.ai ||
+        safeData.tech_stack?.ai_ml
+    ),
+
+    devops: normalizeArray(
+      safeData.devops ||
+        safeData.tech_stack?.devops
+    ),
+
+    storage: normalizeArray(
+      safeData.storage ||
+        safeData.tech_stack?.storage
+    ),
+  };
+
+  const tabs = [
+    { id: "tech", label: "Tech Stack" },
+    { id: "architecture", label: "Architecture" },
+    { id: "workflow", label: "AI Workflow" },
+    { id: "modes", label: "Build Modes" },
+    { id: "deployment", label: "Deployment" },
+    { id: "why", label: "Why This Stack?" },
+    { id: "roadmap", label: "Cost & Roadmap" },
+  ];
+
   return (
-    <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-      <h2 className="text-lg font-semibold text-white mb-5">
-        Tech Stack
-      </h2>
+    <div className="w-full">
 
-      <div className="grid md:grid-cols-2 gap-4">
-        {entries.map(([category, items]) => {
-          const Icon = categoryIcons?.[category] || Layers;
-          const name = categoryNames?.[category] || category;
-
-          const safeItems = normalize(items);
-
-          return (
-            <div
-              key={category}
-              className="bg-white/5 border border-white/10 rounded-xl p-4"
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <Icon className="w-4 h-4 text-emerald-400" />
-                <span className="text-sm text-white/80">{name}</span>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {safeItems.map((tech, i) => (
-                  <span
-                    key={i}
-                    className="px-3 py-1 text-xs rounded-full bg-emerald-500/10 border border-emerald-500/20"
-                  >
-                    {tech}
-                  </span>
-                ))}
-              </div>
-            </div>
-          );
-        })}
+      {/* SUCCESS */}
+      <div className="mb-8">
+        <span className="px-5 py-2 text-sm border rounded-full bg-emerald-500/10 border-emerald-500/20 text-emerald-400">
+          ● Tech Stack Generated
+        </span>
       </div>
-    </div>
-  );
-}
 
-/* =========================
-   DEPLOYMENT
-========================= */
-function DeploymentCard({ deployment }) {
-  if (!deployment) return null;
-
-  return (
-    <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-      <h2 className="text-lg font-semibold text-white mb-3">
-        Deployment
-      </h2>
-      <p className="text-white/70">{deployment}</p>
-    </div>
-  );
-}
-
-/* =========================
-   COST ESTIMATE
-========================= */
-function CostCard({ cost }) {
-  return (
-    <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-      <h2 className="text-lg font-semibold text-white mb-3">
-        Cost Estimate
-      </h2>
-      
-      {cost ? (
-        typeof cost === 'string' ? (
-          <p className="text-white/70">{cost}</p>
-        ) : (
-          <div className="space-y-3">
-            {cost.estimate && (
-              <p className="text-white/70 font-medium">{cost.estimate}</p>
-            )}
-            {cost.breakdown && cost.breakdown.length > 0 && (
-              <ul className="mt-2 text-sm text-gray-400 space-y-1">
-                {cost.breakdown.map((item, i) => (
-                  <li key={i}>• {item}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )
-      ) : (
-        <div className="text-center py-4 border-2 border-dashed border-white/20 rounded-xl">
-          <div className="text-gray-400 text-sm">
-            Cost estimate not available
-          </div>
-          <div className="text-gray-500 text-xs mt-1">
-            Check backend response for cost data
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* =========================
-   REASONING
-========================= */
-function ReasoningCard({ reasoning }) {
-  if (!reasoning) return null;
-
-  return (
-    <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-      <h2 className="text-lg font-semibold text-white mb-3">
-        Why This Stack?
-      </h2>
-      
-      {Array.isArray(reasoning) ? (
-        <div className="space-y-2">
-          {reasoning.map((point, i) => (
-            <div key={i} className="flex gap-3">
-              <div className="w-2 h-2 bg-emerald-400 rounded-full mt-2 flex-shrink-0"></div>
-              <p className="text-white/70">
-                {typeof point === "string" ? point : point?.text || JSON.stringify(point)}
-              </p>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-white/70">{reasoning}</p>
-      )}
-    </div>
-  );
-}
-
-/* =========================
-   ROADMAP
-========================= */
-function RoadmapCard({ roadmap }) {
-  if (!roadmap || roadmap.length === 0) return null;
-
-  return (
-    <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-      <h2 className="text-lg font-semibold text-white mb-4">
-        Roadmap
-      </h2>
-
-      <div className="space-y-3">
-        {roadmap.map((step, i) => (
-          <div key={i} className="flex gap-3">
-            <div className="w-6 h-6 bg-emerald-500 rounded-full text-xs flex items-center justify-center text-white">
-              {i + 1}
-            </div>
-            <p className="text-white/80">{step}</p>
-          </div>
+      {/* TABS */}
+      <div className="flex flex-wrap gap-10 mb-10 border-b border-zinc-800">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`pb-4 text-sm transition-all duration-200 ${
+              activeTab === tab.id
+                ? "text-emerald-400 border-b border-emerald-400"
+                : "text-zinc-500 hover:text-zinc-300"
+            }`}
+          >
+            {tab.label}
+          </button>
         ))}
       </div>
+
+      {/* TECH STACK */}
+      {activeTab === "tech" && (
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+
+          {Object.entries(techStack).map(
+            ([category, items]) => {
+              const Icon =
+                categoryIcons?.[category] || Layers;
+
+              const title =
+                categoryNames?.[category] || category;
+
+              return (
+                <div
+                  key={category}
+                  className="p-6 transition-all border rounded-3xl border-zinc-800 bg-zinc-950 hover:border-emerald-500/30"
+                >
+                  <div className="flex items-center gap-3 mb-6">
+                    <Icon className="w-5 h-5 text-emerald-400" />
+
+                    <h3 className="text-2xl font-semibold text-white">
+                      {title}
+                    </h3>
+                  </div>
+
+                  <div className="flex flex-wrap gap-3">
+
+                    {items.length > 0 ? (
+                      items.map((item, index) => (
+                        <div
+                          key={index}
+                          className="px-4 py-3 border rounded-2xl bg-emerald-500/10 border-emerald-500/20"
+                        >
+                          <div className="font-medium text-white">
+                            {item.name}
+                          </div>
+
+                          {item.purpose && (
+                            <div className="mt-1 text-xs text-zinc-400">
+                              {item.purpose}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-zinc-500">
+                        None
+                      </div>
+                    )}
+
+                  </div>
+                </div>
+              );
+            }
+          )}
+        </div>
+      )}
+
+      {/* ARCHITECTURE */}
+      {activeTab === "architecture" && (
+        <ArchitectureCanvas />
+      )}
+
+      {/* WORKFLOW */}
+      {activeTab === "workflow" && (
+        <WorkflowInfographic />
+      )}
+
+      {/* BUILD MODES */}
+      {activeTab === "modes" && (
+        <BuildModes modes={safeData.build_modes} />
+      )}
+
+      {/* DEPLOYMENT */}
+      {activeTab === "deployment" && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+
+          {Object.entries(safeData.deployment || {}).map(
+            ([key, value]) => (
+              <div
+                key={key}
+                className="bg-[#07111f] border border-white/10 rounded-3xl p-8"
+              >
+                <div className="mb-4 text-lg tracking-wide uppercase text-emerald-400">
+                  {key.replace("_", " ")}
+                </div>
+
+                <div className="text-xl leading-relaxed text-gray-300">
+                  {value}
+                </div>
+              </div>
+            )
+          )}
+
+        </div>
+      )}
+
+      {/* WHY THIS STACK */}
+      {activeTab === "why" && (
+        <div className="bg-[#07111f] border border-white/10 rounded-3xl p-10">
+
+          <h2 className="mb-8 text-4xl font-bold text-white">
+            Why This Stack?
+          </h2>
+
+          <div className="space-y-5">
+
+            {(Array.isArray(safeData.reasoning)
+              ? safeData.reasoning
+              : []
+            ).map((reason, index) => (
+              <div
+                key={index}
+                className="flex items-start gap-4"
+              >
+                <div className="w-2 h-2 mt-3 rounded-full bg-emerald-400" />
+
+                <p className="text-lg leading-relaxed text-gray-300">
+                  {reason}
+                </p>
+              </div>
+            ))}
+
+          </div>
+        </div>
+      )}
+
+      {/* ROADMAP */}
+      {activeTab === "roadmap" && (
+        <div className="space-y-6">
+
+          {/* COST */}
+          <div className="p-8 border rounded-3xl border-zinc-800 bg-zinc-950">
+
+            <h2 className="mb-6 text-2xl font-semibold text-white">
+              Cost Estimate
+            </h2>
+
+            <p className="mb-6 text-white">
+              {safeData.cost?.estimate}
+            </p>
+
+            <div className="space-y-3">
+              {safeData.cost?.breakdown?.map(
+                (item, i) => (
+                  <div
+                    key={i}
+                    className="text-zinc-400"
+                  >
+                    • {item}
+                  </div>
+                )
+              )}
+            </div>
+
+          </div>
+
+          {/* ROADMAP */}
+          <div className="bg-[#0B0F19] border border-white/10 rounded-3xl p-8">
+
+            <h2 className="mb-8 text-3xl font-bold text-white">
+              Product Roadmap
+            </h2>
+
+            <div className="space-y-8">
+
+              {safeData.roadmap?.map((step, index) => (
+                <div
+                  key={index}
+                  className="flex items-start gap-5"
+                >
+                  <div className="flex items-center justify-center w-10 h-10 font-bold text-black rounded-full bg-emerald-400">
+                    {index + 1}
+                  </div>
+
+                  <div>
+                    <h3 className="mb-1 text-lg font-semibold text-white">
+                      Phase {index + 1}
+                    </h3>
+
+                    <p className="text-gray-400">
+                      {step}
+                    </p>
+                  </div>
+                </div>
+              ))}
+
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

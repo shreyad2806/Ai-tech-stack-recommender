@@ -173,6 +173,7 @@ def generate_reasoning(tech_stack: dict, idea: str):
         ]
 
 # ------------------ RECOMMEND ------------------
+# ------------------ RECOMMEND ------------------
 @app.post("/recommend")
 async def recommend(req: IdeaRequest):
     try:
@@ -191,63 +192,184 @@ async def recommend(req: IdeaRequest):
             )
 
         prompt = f"""
-You are a senior system architect.
+You are a world-class AI systems architect.
 
-Return ONLY valid JSON.
+Your job:
+Generate a COMPLETE production-ready AI system design.
 
-Generate a realistic scalable tech stack for this idea.
+IMPORTANT RULES:
+- Return ONLY valid JSON
+- No markdown
+- No backticks
+- No explanations
+- No comments
+- No extra text
 
-Format:
+The result should feel like:
+- AWS architecture consultant
+- YC startup infra advisor
+- Vercel AI architect
+- senior AI engineer
+
+The response MUST be:
+- scalable
+- visually renderable
+- modern
+- startup realistic
+- concise but informative
+
+Return STRICT JSON in this EXACT schema:
+
 {{
+  "title": "Project title",
+
   "frontend": [
     {{
-      "name": "React",
-      "purpose": "Frontend UI"
+      "name": "Next.js",
+      "purpose": "Frontend dashboard and SSR"
     }}
   ],
+
   "backend": [
     {{
       "name": "FastAPI",
-      "purpose": "Backend APIs"
+      "purpose": "Backend APIs and AI orchestration"
     }}
   ],
+
   "database": [
     {{
       "name": "PostgreSQL",
-      "purpose": "Primary database"
+      "purpose": "Primary relational database"
     }}
   ],
+
   "ai": [
     {{
       "name": "OpenAI API",
-      "purpose": "AI inference"
+      "purpose": "LLM reasoning and generation"
     }}
   ],
+
   "devops": [
     {{
       "name": "Docker",
-      "purpose": "Containerization"
+      "purpose": "Containerized deployment"
     }}
   ],
-  "flow": [
+
+  "storage": [
     {{
-      "from": "Frontend",
-      "to": "Backend"
+      "name": "AWS S3",
+      "purpose": "Object and file storage"
+    }}
+  ],
+
+  "architecture_summary":
+    "2-3 sentence scalable architecture overview.",
+
+  "workflow": [
+    {{
+      "step": "User Query",
+      "description": "User sends prompt from dashboard."
     }},
     {{
-      "from": "Backend",
-      "to": "Database"
+      "step": "Prompt Optimization",
+      "description": "Backend validates and enriches prompts."
+    }},
+    {{
+      "step": "Retriever",
+      "description": "Relevant context and data are fetched."
+    }},
+    {{
+      "step": "LLM Reasoning",
+      "description": "AI model generates decisions and architecture."
+    }},
+    {{
+      "step": "Validation",
+      "description": "System validates outputs and formatting."
+    }},
+    {{
+      "step": "Response Formatter",
+      "description": "Structured frontend-ready response is generated."
     }}
+  ],
+
+  "build_modes": {{
+    "mvp": [
+      "Single backend service",
+      "Basic AI inference",
+      "Simple cloud deployment",
+      "Minimal monitoring"
+    ],
+
+    "production": [
+      "Redis queues",
+      "Scalable APIs",
+      "CI/CD pipelines",
+      "Analytics and monitoring",
+      "Background workers"
+    ],
+
+    "enterprise": [
+      "Kubernetes orchestration",
+      "Multi-region scaling",
+      "Advanced observability",
+      "Role-based access control",
+      "Microservice architecture"
+    ]
+  }},
+
+  "deployment": {{
+    "frontend":
+      "Deploy frontend on Vercel with CDN and edge caching.",
+
+    "backend":
+      "Deploy backend using Docker containers on AWS ECS.",
+
+    "database":
+      "Use managed PostgreSQL with automated backups on AWS RDS.",
+
+    "monitoring":
+      "Use Grafana, Prometheus, and Sentry for monitoring.",
+
+    "scaling":
+      "Use Redis queues, autoscaling, and load balancing."
+  }},
+
+  "reasoning": [
+    "Next.js selected for fast frontend rendering and scalability.",
+    "FastAPI chosen for async APIs and AI orchestration.",
+    "PostgreSQL selected for reliable structured storage.",
+    "Redis added for queues and caching performance.",
+    "Docker chosen for reproducible infrastructure deployments."
+  ],
+
+  "cost": {{
+    "estimate": "$80-300/month",
+
+    "breakdown": [
+      "Frontend Hosting: $20/month",
+      "Backend Infrastructure: $80/month",
+      "Database Hosting: $40/month",
+      "AI APIs: $100/month",
+      "Monitoring & DevOps: $30/month"
+    ]
+  }},
+
+  "roadmap": [
+    "Design scalable system architecture",
+    "Setup frontend dashboard and authentication",
+    "Build backend APIs and AI orchestration layer",
+    "Integrate vector database and AI services",
+    "Add monitoring, analytics, and logging",
+    "Deploy production infrastructure",
+    "Optimize performance and scaling"
   ]
 }}
 
-Rules:
-- Return only JSON
-- No markdown
-- No explanations
-- Keep output concise
+Generate architecture for this startup idea:
 
-Idea:
 {idea}
 """
 
@@ -260,16 +382,20 @@ Idea:
                         "content": prompt
                     }
                 ],
-                temperature=0.4,
-                max_tokens=800
+                temperature=0.5,
+                max_tokens=2500
             )
 
-            raw = (response.choices[0].message.content or "").strip()
+            raw = (
+                response.choices[0]
+                .message.content
+                or ""
+            ).strip()
 
             if not raw:
                 raise Exception("Empty AI response")
 
-            log.info(f"✅ RAW AI RESPONSE:\n{raw}")
+            log.info(f"✅ RAW AI RESPONSE:\\n{raw}")
 
         except Exception as e:
             log.error(f"❌ AI API Error: {e}")
@@ -278,10 +404,17 @@ Idea:
                 status_code=500,
                 content={
                     "success": False,
-                    "error": "AI API request failed",
+                    "error": "AI request failed",
                     "details": str(e)
                 }
             )
+
+        # CLEAN RESPONSE
+        raw = (
+            raw.replace("```json", "")
+            .replace("```", "")
+            .strip()
+        )
 
         try:
             parsed = json.loads(raw)
@@ -290,46 +423,83 @@ Idea:
 
         except json.JSONDecodeError as e:
             log.error(f"❌ JSON Parse Error: {e}")
+            log.error(f"❌ RAW RESPONSE:\\n{raw}")
 
             return JSONResponse(
                 status_code=500,
                 content={
                     "success": False,
                     "error": "Invalid JSON returned by AI",
-                    "details": str(e)
+                    "details": str(e),
+                    "raw": raw
                 }
             )
 
-        cost_estimate = generate_cost_estimate(parsed, idea)
-        reasoning = generate_reasoning(parsed, idea)
-
-        response = {
+        final_response = {
             "success": True,
+
             "idea": idea,
-            "architecture": {
-                "description": f"Scalable architecture for {idea}"
-            },
+
+            "title": parsed.get(
+                "title",
+                "AI System Design"
+            ),
+
+            "architecture_summary": parsed.get(
+                "architecture_summary",
+                ""
+            ),
+
             "tech_stack": {
                 "frontend": parsed.get("frontend", []),
                 "backend": parsed.get("backend", []),
                 "database": parsed.get("database", []),
                 "ai_ml": parsed.get("ai", []),
-                "devops": parsed.get("devops", [])
+                "devops": parsed.get("devops", []),
+                "storage": parsed.get("storage", [])
             },
-            "deployment": "Deploy frontend on Vercel and backend on AWS",
-            "roadmap": [
-                "Setup project architecture",
-                "Build frontend and backend",
-                "Integrate database",
-                "Deploy and monitor"
-            ],
-            "cost": cost_estimate,
-            "reasoning": reasoning
+
+            "workflow": parsed.get(
+                "workflow",
+                []
+            ),
+
+            "build_modes": parsed.get(
+                "build_modes",
+                {
+                    "mvp": [],
+                    "production": [],
+                    "enterprise": []
+                }
+            ),
+
+            "deployment": parsed.get(
+                "deployment",
+                {}
+            ),
+
+            "reasoning": parsed.get(
+                "reasoning",
+                []
+            ),
+
+            "cost": parsed.get(
+                "cost",
+                {
+                    "estimate": "$0",
+                    "breakdown": []
+                }
+            ),
+
+            "roadmap": parsed.get(
+                "roadmap",
+                []
+            )
         }
 
         log.info("✅ Recommendation generated successfully")
 
-        return response
+        return final_response
 
     except HTTPException as e:
         raise e
@@ -346,6 +516,7 @@ Idea:
                 "details": str(e)
             }
         )
+       
 
 # ------------------ STREAM ------------------
 @app.post("/recommend-stream")
@@ -369,7 +540,7 @@ async def recommend_stream(data: IdeaRequest):
                 max_tokens=400
             )
 
-            text = response.choices[0].message.content
+            text = response.choices[0].message.content or ""
 
             for chunk in text.split():
                 yield chunk + " "
