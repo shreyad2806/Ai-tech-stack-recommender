@@ -9,9 +9,9 @@ import {
   Layers,
 } from "lucide-react";
 
-import BuildModes from "./buildmodes";
-import ArchitectureCanvas from "./ArchitectureCanvas";
+import ArchitectureCanvas from "./visuals/ArchitectureCanvas";
 import WorkflowInfographic from "./WorkflowInfographic";
+import BuildModes from "./buildmodes";
 
 const categoryIcons = {
   frontend: Monitor,
@@ -200,12 +200,12 @@ export default function ResultView({ data }) {
 
       {/* ARCHITECTURE */}
       {activeTab === "architecture" && (
-        <ArchitectureCanvas />
+        <ArchitectureCanvas graph={safeData.architecture_graph || safeData.architecture || {}} />
       )}
 
       {/* WORKFLOW */}
       {activeTab === "workflow" && (
-        <WorkflowInfographic />
+        <WorkflowInfographic workflow={safeData.workflow_infographic || safeData.workflow || []} />
       )}
 
       {/* BUILD MODES */}

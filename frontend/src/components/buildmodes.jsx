@@ -1,39 +1,37 @@
 import React from "react";
 
-const modeStyles = {
-  mvp: "border-emerald-500/30 bg-emerald-500/5",
-  production: "border-cyan-500/30 bg-cyan-500/5",
-  enterprise: "border-purple-500/30 bg-purple-500/5",
-};
+const modes = [
+  {
+    title: "MVP",
+    desc: "Fastest way to validate the idea.",
+  },
+  {
+    title: "Production",
+    desc: "Scalable production-ready infrastructure.",
+  },
+  {
+    title: "Enterprise",
+    desc: "Multi-tenant enterprise AI architecture.",
+  },
+];
 
-export default function BuildModes({ modes }) {
-  if (!modes) return null;
-
+export default function BuildModes() {
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-
-      {Object.entries(modes).map(([key, items]) => (
+    <div className="grid grid-cols-3 gap-6">
+      {modes.map((mode, index) => (
         <div
-          key={key}
-          className={`rounded-3xl border p-7 ${modeStyles[key]}`}
+          key={index}
+          className="rounded-3xl border border-zinc-800 bg-[#020617] p-8"
         >
-          <h2 className="mb-6 text-3xl font-bold text-white capitalize">
-            {key}
+          <h2 className="mb-4 text-3xl font-bold text-white">
+            {mode.title}
           </h2>
 
-          <div className="space-y-4">
-            {items.map((item, index) => (
-              <div
-                key={index}
-                className="px-4 py-3 text-gray-300 border bg-black/40 border-white/10 rounded-xl"
-              >
-                {item}
-              </div>
-            ))}
-          </div>
+          <p className="text-zinc-400">
+            {mode.desc}
+          </p>
         </div>
       ))}
-
     </div>
   );
 }
